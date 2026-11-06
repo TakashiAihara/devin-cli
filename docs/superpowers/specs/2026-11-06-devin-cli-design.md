@@ -65,6 +65,7 @@ src/cli.ts (commander) → bin: devin-cli
 1. `https://docs.devin.ai/_llms/en/api.txt` を取得し、`api-reference/v3/` を含む `.md` URL を収集
 2. 各ページを並列（同時 8 本程度）で fetch し、````yaml v3-openapi.yaml` フェンスの中身を抽出
 3. `yaml` パッケージでパースし、fragment ごとに `paths` / `components.schemas` / `components.securitySchemes` をマージ
+   - `paths` は path × method の単位でマージする。同じ path の GET と POST が別ページの fragment に載っていても両方残る。同じ path・method で内容が異なる場合は失敗終了、完全一致なら dedupe（同一 operation を 2 ページに載せる docs で誤爆しないため）
    - `components.schemas` は名前で dedupe。同名で内容が異なる場合は operationId と同じく失敗終了（先勝ちだと誤った型が黙って入るため）
    - `$ref` は `#/components/schemas/...` 形式で完結しているため、マージ後もそのまま解決できる
 4. `operationId` を正規化: `method` + path セグメントから camelCase を生成（例: `GET /v3/organizations/{org_id}/consumption/daily` → `getOrganizationsOrgIdConsumptionDaily`、`GET /v3/self` → `getSelf`）。重複があれば警告ではなく失敗終了
@@ -86,11 +87,11 @@ src/cli.ts (commander) → bin: devin-cli
   - `override.mutator: { path: './src/api/mutator.ts', name: 'apiFetch' }`
 - 生成物は `src/generated/` にコミット（`bun build --compile` やテストが orval 無しで通るように）
 - `src/api/mutator.ts` の責務:
-  - 受け取った URL に `apiBaseUrl()` を前置して絶対 URL にする。Orval が相対 path（`/v3/self`）を渡すか絶対 URL を渡すかは `output.baseUrl` の設定次第なので、両方で動く形にする（fragment 側の `servers` は Orval の動作に効かない可能性がある。実装時に最初の `bun run generate` で生成コードを読んで確定する）
+  - 受け取った URL を絶対 URL に正規化する。Orval が相対 path（`/v3/self`）を渡すなら `apiBaseUrl()` を前置し、絶対 URL を渡すなら origin を `apiBaseUrl()` の値に差し替える（両方で動く形にする。fragment 側の `servers` は Orval の動作に効かない可能性がある。実装時に最初の `bun run generate` で生成コードを読んで確定する）
   - `Authorization: Bearer <DEVIN_API_KEY>` を注入（`secret()` 経由。env → config `api_key_command` の順）
-  - 実際の HTTP は `src/lib.ts` の `send(url, init, ms)` を呼ぶ薄い層にする。`send()` は第 3 引数 `ms` で `AbortSignal.timeout(ms)` を内部で付けるので、mutator 側で signal を自前で作らない（Orval が渡す `signal` も潰さない）。タイムアウトは `send()` の `ms` に `apiTimeoutMs()` を渡す
+  - 実際の HTTP は `src/lib.ts` の `send(url, init, ms)` を呼ぶ薄い層にする。`send()` は第 3 引数 `ms` で `AbortSignal.timeout(ms)` を内部で付け、`init.signal` は常に上書きする。CLI では呼び出し側から abort することはないので、Orval が渡す `signal` は使わない前提でよい（両立させたければ `send()` を `AbortSignal.any` に変える手もあるが v1 では不要）。タイムアウトは `send()` の `ms` に `apiTimeoutMs()` を渡す
   - `send()` の結果が `!ok` → body を `ProblemDetail` としてパースし、`detail`/`title`/`status` を持つ `ApiError`（`ExitError` 継承）を throw。HTTP status に応じた exit code は下記「エラー処理」に従う
-  - proxy が返す 502/503/504 の HTML を「届かなかった」(exit 2) と扱う判定と `CommError` は `send()` 側のものを使う。`CommError` の文言は 9router 向けに決め打ちされているので、Devin 向けの文言に一般化してから使う
+  - proxy が返す 502/503/504 の HTML を「届かなかった」(exit 2) と扱う判定と `CommError` は `send()` 側のものを使う。`send()` と `CommError` は 9router 向けの文言・名前が埋め込まれているので、Devin 向けに一般化してから使う（`src/lib.ts` を 9router-cli から移植する際に併せて直す）
   - 成功時は body を JSON parse して返す（`includeHttpResponseReturnType: false` に合わせて `{data,...}` ではなくデータ本体）
 - mutator の signature は Orval fetch client の規約に従う（実装時に生成コードと照合して確定する）
 
@@ -119,12 +120,12 @@ devin-cli metrics <usage|sessions|prs|searches|dau|wau|mau|active-users> [--days
 - `consumption service-user <id>` / `consumption session <id>`: それぞれの per-ID endpoint。ID は利用者が指定する
 - `metrics *`: org metrics 各エンドポイントに対応。対応はページ名ではなく path で管理する（例: org 用は `/v3/organizations/{org_id}/metrics/usage`。`organizations-metrics-usage.md` というページ名は enterprise 用 `/v3/enterprise/organizations/{org_id}/metrics/usage` を指すので注意）。`--days N`（既定 30）を `time_after` / `time_before` に変換して渡す
 - metrics の TSV は endpoint ごとの応答形状に合わせて列を定義する:
-  - `usage`: スカラー 4 つ（sessions_count / searches_count / prs_created_count / prs_merged_count）を 1 行の key-value TSV
+  - `usage`: ヘッダ `sessions_count	searches_count	prs_created_count	prs_merged_count`、データ 1 行の TSV
   - `dau` / `wau` / `mau`: `ActiveUserMetricsListResponse` の時系列を date × 件数の行 TSV
   - `active-users`: 単一オブジェクトのフィールドを行 TSV
   - `sessions` / `prs` / `searches`: ネスト（origin 別・size 別等）を平坦化した行 TSV。正確な列は生成された型を見て実装時に確定する
   - いずれも `--json` では生 JSON を返す
-- `--days N`: consumption / metrics / billing 共通。今日を含む N 暦日分を対象にし、窓は UTC-8 の日境界に揃える: `time_after` = 今日（UTC-8）の 0 時の (N-1) 日前 0 時、`time_before` = 現在時刻。`now - N*86400` のような連続窓だと端数の日が混ざり、ダッシュボードの集計と合わなくなるため。N=1 なら今日の 0 時〜現在（今日の途中経過のみ）になる。完了した日だけに絞る選択肢は v1 では持たない
+- `--days N`: consumption / metrics / billing 共通。今日を含む N 暦日分を対象にし、窓は UTC-8 の日境界に揃える: `time_after` = 今日（UTC-8）の 0 時の (N-1) 日前 0 時、`time_before` = 現在時刻。`now - N*86400` のような連続窓だと端数の日が混ざり、ダッシュボードの集計と合わなくなるため。N=1 なら今日の 0 時〜現在（今日の途中経過のみ）になる。完了した日だけに絞る選択肢は v1 では持たない。N が 0 以下・非整数なら引数不正として exit 2。窓の計算は `now` を引数に取る純関数に切り出し、subprocess テストとは別に直接ユニットテストする（「今日 0 時」や夏時間中の日付を固定して検証するため）
 - `date` フィールド（Unix 秒）は表示時に `YYYY-MM-DD`（UTC-8 固定）へ変換する
 - `--org ID`: org scope コマンド共通。省略時は org 解決（下記）
 
@@ -215,6 +216,7 @@ tests/
 - Pro plan で org endpoint が通るか未検証: 実装の初手で PAT を作り `GET /v3/self` → `consumption/daily` と `metrics/usage` を手で叩いて確認する。consumption は「all plans」注記があるが metrics には無いので、metrics が 403 なら権限不足かプラン非対応かを `detail` で判別する
 - PAT に必要な権限: `ViewOrgConsumption` と `ViewOrgMetrics` を PAT 作成時に付ける（付け忘れると 403 で「Pro 非対応」と誤読しやすい）
 - `time_after` / `time_before` の境界が inclusive か exclusive かは docs 未記載。日バケットはちょうど 08:00 UTC から始まるので、exclusive だと先頭の日が落ちる。初回の実測時に「境界ちょうど 08:00 UTC の日が結果に含まれるか」を確認し、必要なら `time_after` を 1 秒ずらす等で調整する
+- metrics 系 endpoint に API 側の期間上限（例: 最大 90 日）があるかは未確認。初回の実測で `--days` を大きくしたときの挙動を確かめ、上限があれば CLI 側でも検査する
 - Orval の mutator の細部: 生成コードが mutator に渡す URL/option の形（相対 path か絶対 URL か、signal の有無）は実装時に生成物を読んで確定する
 - OpenAPI 3.1 の型表現: fragment は `openapi: 3.1.0` で `anyOf: [type, 'null']` や `const` を使う。Orval がこれらを期待どおりの TypeScript 型に落とすかは未検証で、初回の `bun run generate` で生成型を確認する
 - `acus_by_product` の null 許容: `automation` / `review` はデータが無いと `null`。表示では `-` にする
