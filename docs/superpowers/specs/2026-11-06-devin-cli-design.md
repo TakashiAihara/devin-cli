@@ -1,10 +1,12 @@
 # devin-cli 設計
 
 - 作成日: 2026-11-06
-- ステータス: ドラフト（Opus 2 回レビュー反映済み）
+- ステータス: 確定（Opus 4 回レビューで問題なし判定。ユーザー承認済みとして PR 化）
 - 変更履歴:
   - Opus (claude-opus-5-5) 1 回目: 指摘 16 件を一次資料と突き合わせて採否し、採用分を反映
   - Opus 2 回目: `--days` 窓の 1 日ずれ、PST/UTC-8 の扱い、mutator と send() の責務、metrics 出力形式などを反映
+  - Opus 3 回目: paths の path×method マージ、signal 上書き前提、絶対 URL 正規化、窓計算の純関数化などを反映
+  - Opus 4 回目: 問題なし判定。実データ検証（v3 全 236 ページでマージ模擬）に基づく軽微修正 5 件を反映
 
 ## 目的
 
@@ -13,7 +15,7 @@ Devin API v3 を CLI から使えるようにする。最優先は usage / billi
 ## 前提（調査済みの事実）
 
 - API ベース: `https://api.devin.ai/v3`。認証は `Authorization: Bearer cog_...` で、Personal Access Token (PAT) と Service User API Key は同じ形式・同じヘッダで使える
-- 各 API ドキュメントページ (`docs.devin.ai/api-reference/v3/**.md`) に、そのエンドポイントの OpenAPI fragment が ````yaml v3-openapi.yaml` フェンスで埋め込まれている。手書きの spec は不要で、スクレイプ＋マージで機械生成できる
+- 各 API ドキュメントページ (`docs.devin.ai/api-reference/v3/**.md`) に、そのエンドポイントの OpenAPI fragment が ```` ````yaml v3-openapi.yaml <METHOD> <PATH>` ```` 形式のフェンスで埋め込まれている（例: ````yaml v3-openapi.yaml GET /v3/self`。フェンス行の後ろに method と path が続き、閉じは ```` ``` ````）。手書きの spec は不要で、スクレイプ＋マージで機械生成できる
 - `GET /v3/self` は無権限で呼べ、`principal_type`（`service_user` / `pat_user` / `devin_brain` / `windsurf_session` の 4 種）と org 系 ID (`org_id` / `devin_sessions_org_id` / `primary_billing_org_id`) を返す。org ID の自動検出に使う。`x-cog-org-id` ヘッダはこちらからは送らない
 - consumption の org endpoint は「all plans, including Teams and self-serve」の注記があるが、metrics の org ページには同じ注記が無い。Pro で metrics が使えるかは consumption とは別に実測で確かめる必要がある
 - consumption に必要な権限は `ViewOrgConsumption`、metrics は `ViewOrgMetrics`（いずれも org レベル）。PAT / service user に付与されていないと 403 になる
@@ -63,7 +65,7 @@ src/cli.ts (commander) → bin: devin-cli
 ## OpenAPI spec パイプライン（`scripts/sync-openapi.ts`）
 
 1. `https://docs.devin.ai/_llms/en/api.txt` を取得し、`api-reference/v3/` を含む `.md` URL を収集
-2. 各ページを並列（同時 8 本程度）で fetch し、````yaml v3-openapi.yaml` フェンスの中身を抽出
+2. 各ページを並列（同時 8 本程度）で fetch し、````yaml v3-openapi.yaml <METHOD> <PATH>` で始まるフェンスの中身を抽出（フェンス行の後ろに method と path が続く形式。閉じフェンスは ```` ``` ````）
 3. `yaml` パッケージでパースし、fragment ごとに `paths` / `components.schemas` / `components.securitySchemes` をマージ
    - `paths` は path × method の単位でマージする。同じ path の GET と POST が別ページの fragment に載っていても両方残る。同じ path・method で内容が異なる場合は失敗終了、完全一致なら dedupe（同一 operation を 2 ページに載せる docs で誤爆しないため）
    - `components.schemas` は名前で dedupe。同名で内容が異なる場合は operationId と同じく失敗終了（先勝ちだと誤った型が黙って入るため）
@@ -121,7 +123,7 @@ devin-cli metrics <usage|sessions|prs|searches|dau|wau|mau|active-users> [--days
 - `metrics *`: org metrics 各エンドポイントに対応。対応はページ名ではなく path で管理する（例: org 用は `/v3/organizations/{org_id}/metrics/usage`。`organizations-metrics-usage.md` というページ名は enterprise 用 `/v3/enterprise/organizations/{org_id}/metrics/usage` を指すので注意）。`--days N`（既定 30）を `time_after` / `time_before` に変換して渡す
 - metrics の TSV は endpoint ごとの応答形状に合わせて列を定義する:
   - `usage`: ヘッダ `sessions_count	searches_count	prs_created_count	prs_merged_count`、データ 1 行の TSV
-  - `dau` / `wau` / `mau`: `ActiveUserMetricsListResponse` の時系列を date × 件数の行 TSV
+  - `dau` / `wau` / `mau`: `ActiveUserMetricsListResponse` の各要素 `{start_time, end_time, active_users}` を start_time / end_time / active_users の行 TSV。時刻は UTC-8 で `YYYY-MM-DD` 表示（metrics の日境界は docs 未記載のため、consumption と同じ UTC-8 に揃える。実測で境界が違うと分かったら見直す）
   - `active-users`: 単一オブジェクトのフィールドを行 TSV
   - `sessions` / `prs` / `searches`: ネスト（origin 別・size 別等）を平坦化した行 TSV。正確な列は生成された型を見て実装時に確定する
   - いずれも `--json` では生 JSON を返す
@@ -147,7 +149,7 @@ devin-cli metrics <usage|sessions|prs|searches|dau|wau|mau|active-users> [--days
 - env:
   - `DEVIN_API_KEY` — `cog_` トークン（PAT / service user 共通）
   - `DEVIN_ORG_ID` — org ID（任意。省略時は自動解決）
-  - `DEVIN_API_BASE_URL` — 既定 `https://api.devin.ai`（テスト・プロキシ用）
+  - `DEVIN_API_BASE_URL` — 既定 `https://api.devin.ai`（テスト・プロキシ用）。origin（scheme + host[:port]）のみ有効で、path を含む値は設定エラーとして exit 2
   - `DEVIN_API_TIMEOUT` — API の 1 リクエストあたりの時間切れ秒。既定 20
   - `DEVIN_COMMAND_TIMEOUT` — 設定の `*_command` の時間切れ秒。既定 60
 - config: `$XDG_CONFIG_HOME/devin-cli/config.toml`（`XDG_CONFIG_HOME` 無ければ `~/.config/devin-cli/config.toml`）
@@ -162,7 +164,7 @@ devin-cli metrics <usage|sessions|prs|searches|dau|wau|mau|active-users> [--days
 exit code の意味: 0 = 成功、1 = 相手（API）が否と答えた、2 = 使い方・秘密・通信の誤り、70 = 想定外の内部エラー。
 
 - 401 Unauthorized → exit 2（認証情報の誤り。9router-cli が login 失敗を exit 2 にするのと同じ扱い。「`DEVIN_API_KEY` を確認する」旨を添える）
-- その他の HTTP エラー (403 / 404 / 422 / 429 / 5xx) → `ProblemDetail` の `detail`（無ければ `title`）と status を stderr に出して exit 1。429 はリトライせずそのまま返す
+- その他の HTTP エラー (403 / 404 / 422 / 429 / 5xx) → `ProblemDetail` の `detail`（無ければ `title`）と status を stderr に出して exit 1。429 はリトライせずそのまま返す。body を `ProblemDetail` として読めない場合（空 body、proxy 以外の HTML 等）は status と statusText で `ApiError` を作り、同じ exit code 規則（401 → exit 2、それ以外 → exit 1）に従う
 - fetch 失敗・タイムアウト → `CommError` で exit 2
 - 必須設定の欠落・引数不正 → exit 2
 - 想定外の例外 → `cli.ts` の catch で exit 70
@@ -216,7 +218,7 @@ tests/
 - Pro plan で org endpoint が通るか未検証: 実装の初手で PAT を作り `GET /v3/self` → `consumption/daily` と `metrics/usage` を手で叩いて確認する。consumption は「all plans」注記があるが metrics には無いので、metrics が 403 なら権限不足かプラン非対応かを `detail` で判別する
 - PAT に必要な権限: `ViewOrgConsumption` と `ViewOrgMetrics` を PAT 作成時に付ける（付け忘れると 403 で「Pro 非対応」と誤読しやすい）
 - `time_after` / `time_before` の境界が inclusive か exclusive かは docs 未記載。日バケットはちょうど 08:00 UTC から始まるので、exclusive だと先頭の日が落ちる。初回の実測時に「境界ちょうど 08:00 UTC の日が結果に含まれるか」を確認し、必要なら `time_after` を 1 秒ずらす等で調整する
-- metrics 系 endpoint に API 側の期間上限（例: 最大 90 日）があるかは未確認。初回の実測で `--days` を大きくしたときの挙動を確かめ、上限があれば CLI 側でも検査する
+- metrics 系 endpoint に API 側の期間上限（例: 最大 90 日）があるかは未確認。初回の実測で `--days` を大きくしたときの挙動を確かめ、上限があれば CLI 側でも検査する。あわせて metrics の `start_time` / `end_time` の日境界が consumption と同じ UTC-8 0 時かも実測で確認する
 - Orval の mutator の細部: 生成コードが mutator に渡す URL/option の形（相対 path か絶対 URL か、signal の有無）は実装時に生成物を読んで確定する
 - OpenAPI 3.1 の型表現: fragment は `openapi: 3.1.0` で `anyOf: [type, 'null']` や `const` を使う。Orval がこれらを期待どおりの TypeScript 型に落とすかは未検証で、初回の `bun run generate` で生成型を確認する
 - `acus_by_product` の null 許容: `automation` / `review` はデータが無いと `null`。表示では `-` にする
