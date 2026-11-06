@@ -1,5 +1,5 @@
 #!/usr/bin/env bun
-import { Command, InvalidArgumentError, Option } from "commander";
+import { Argument, Command, InvalidArgumentError, Option } from "commander";
 import { runBilling } from "./commands/billing.ts";
 import {
   runConsumptionDaily,
@@ -7,6 +7,7 @@ import {
   runConsumptionSession,
   runConsumptionUser,
 } from "./commands/consumption.ts";
+import { METRICS, runMetrics, type MetricsName } from "./commands/metrics.ts";
 import { runSelf } from "./commands/self.ts";
 import { VERSION } from "./version.ts";
 
@@ -134,6 +135,19 @@ consumption
         org: opts.org,
         json: opts.json === true,
       }),
+    );
+  });
+
+program
+  .command("metrics")
+  .description("組織の利用 metrics (usage/sessions/prs/searches/dau/wau/mau/active-users)")
+  .addArgument(new Argument("<name>", "metrics 名").choices(METRICS))
+  .addOption(daysOption())
+  .addOption(orgOption())
+  .option(JSON_FLAG, JSON_HELP)
+  .action(async (name: MetricsName, opts: { days: number; org?: string; json?: boolean }) => {
+    process.exit(
+      await runMetrics({ name, days: opts.days, org: opts.org, json: opts.json === true }),
     );
   });
 
