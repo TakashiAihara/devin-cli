@@ -1,5 +1,12 @@
 #!/usr/bin/env bun
-import { Command } from "commander";
+import { Command, InvalidArgumentError, Option } from "commander";
+import { runBilling } from "./commands/billing.ts";
+import {
+  runConsumptionDaily,
+  runConsumptionServiceUser,
+  runConsumptionSession,
+  runConsumptionUser,
+} from "./commands/consumption.ts";
 import { runSelf } from "./commands/self.ts";
 import { VERSION } from "./version.ts";
 
@@ -30,12 +37,104 @@ api_key_command / org_id / api_base_url が書ける。秘密の平文は書け�
 `,
 );
 
+const days = (value: string): number => {
+  const n = Number(value);
+  if (!Number.isSafeInteger(n) || n < 1) throw new InvalidArgumentError("1 以上の整数を指定する");
+  return n;
+};
+
+const daysOption = () =>
+  new Option("--days <n>", "直近 N 暦日 (UTC-8 日境界、今日を含む)").argParser(days).default(30);
+const orgOption = () => new Option("--org <id>", "org ID (省略時は自動解決)");
+
 program
   .command("self")
   .description("GET /v3/self。認証と principal の確認")
   .option(JSON_FLAG, JSON_HELP)
   .action(async (opts: { json?: boolean }) => {
     process.exit(await runSelf({ json: opts.json === true }));
+  });
+
+program
+  .command("billing")
+  .description("直近 N 日の ACU 消費サマリ (合計・製品別・日別)")
+  .addOption(daysOption())
+  .addOption(orgOption())
+  .option(JSON_FLAG, JSON_HELP)
+  .action(async (opts: { days: number; org?: string; json?: boolean }) => {
+    process.exit(await runBilling({ days: opts.days, org: opts.org, json: opts.json === true }));
+  });
+
+const consumption = program
+  .command("consumption")
+  .description("日次 ACU 消費 (組織・ユーザー・service user・session)");
+
+consumption
+  .command("daily")
+  .description("組織の日次消費")
+  .addOption(daysOption())
+  .addOption(orgOption())
+  .option(JSON_FLAG, JSON_HELP)
+  .action(async (opts: { days: number; org?: string; json?: boolean }) => {
+    process.exit(
+      await runConsumptionDaily({ days: opts.days, org: opts.org, json: opts.json === true }),
+    );
+  });
+
+consumption
+  .command("user")
+  .description("ユーザーの日次消費 (user_id 省略時は self の user_id)")
+  .argument("[user_id]", "ユーザー ID")
+  .addOption(daysOption())
+  .addOption(orgOption())
+  .option(JSON_FLAG, JSON_HELP)
+  .action(
+    async (userId: string | undefined, opts: { days: number; org?: string; json?: boolean }) => {
+      process.exit(
+        await runConsumptionUser({
+          userId,
+          days: opts.days,
+          org: opts.org,
+          json: opts.json === true,
+        }),
+      );
+    },
+  );
+
+consumption
+  .command("service-user")
+  .description("service user の日次消費")
+  .argument("<service_user_id>", "service user ID")
+  .addOption(daysOption())
+  .addOption(orgOption())
+  .option(JSON_FLAG, JSON_HELP)
+  .action(async (serviceUserId: string, opts: { days: number; org?: string; json?: boolean }) => {
+    process.exit(
+      await runConsumptionServiceUser({
+        serviceUserId,
+        days: opts.days,
+        org: opts.org,
+        json: opts.json === true,
+      }),
+    );
+  });
+
+consumption
+  .command("session")
+  .description("session の日次消費")
+  .argument("<session_id>", "session ID")
+  .addOption(daysOption())
+  .addOption(orgOption())
+  .option(JSON_FLAG, JSON_HELP)
+  .action(async (sessionId: string, opts: { days: number; org?: string; json?: boolean }) => {
+    process.exit(
+      await runConsumptionSession({
+        sessionId,
+        days: opts.days,
+        org: opts.org,
+        json: opts.json === true,
+      }),
+    );
   });
 
 // 1 は相手が否と答えた、2 は使い方・秘密・通信の誤り、70 は想定外の内部エラー
