@@ -175,7 +175,7 @@ async function fetchPage(url: string): Promise<Fragment | null> {
 }
 
 async function pool<T, R>(items: T[], n: number, fn: (t: T) => Promise<R>): Promise<R[]> {
-  const out: R[] = new Array(items.length);
+  const out: R[] = [];
   let next = 0;
   await Promise.all(
     Array.from({ length: Math.min(n, items.length) }, async () => {
