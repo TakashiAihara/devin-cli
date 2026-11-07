@@ -1,0 +1,18 @@
+{
+  "$schema": "./node_modules/oxfmt/configuration_schema.json",
+  "printWidth": 100,
+  "tabWidth": 2,
+  "singleQuote": false,
+  "semi": true,
+  "trailingComma": "all",
+  "bracketSpacing": true,
+  "ignorePatterns": [
+    "*.md",
+    "bun.lock",
+    "**/node_modules/",
+    "**/dist/",
+    "**/tmp/",
+    "openapi/devin-v3.yaml",
+    "src/generated/**"
+  ]
+}
