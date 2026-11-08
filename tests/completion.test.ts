@@ -10,9 +10,20 @@ afterEach(() => {
   removeSandbox(sb);
 });
 
-const TOP_COMMANDS = ["self", "billing", "consumption", "metrics", "completion"];
+const TOP_COMMANDS = ["self", "billing", "consumption", "metrics", "sessions", "completion"];
 const CONSUMPTION_SUBCOMMANDS = ["daily", "user", "service-user", "session"];
 const METRIC_NAMES = ["usage", "sessions", "prs", "searches", "dau", "wau", "mau", "active-users"];
+const SESSIONS_SUBCOMMANDS = [
+  "list",
+  "get",
+  "messages",
+  "insights",
+  "attachments",
+  "create",
+  "archive",
+  "tags",
+  "delete",
+];
 
 describe("completion", () => {
   test("bash は complete -F のスクリプトを出す", async () => {
@@ -21,9 +32,15 @@ describe("completion", () => {
     expect(r.err).toBe("");
     expect(r.out).toContain("complete -F _devin_cli devin-cli");
     expect(r.out).toContain("compgen -W");
-    for (const w of [...TOP_COMMANDS, ...CONSUMPTION_SUBCOMMANDS, ...METRIC_NAMES])
+    for (const w of [
+      ...TOP_COMMANDS,
+      ...CONSUMPTION_SUBCOMMANDS,
+      ...METRIC_NAMES,
+      ...SESSIONS_SUBCOMMANDS,
+    ])
       expect(r.out).toContain(w);
-    for (const o of ["--days", "--org", "--json"]) expect(r.out).toContain(o);
+    for (const o of ["--days", "--org", "--json", "--limit", "--prompt", "--yes"])
+      expect(r.out).toContain(o);
   });
 
   test("zsh は #compdef のスクリプトを出す", async () => {
@@ -32,9 +49,15 @@ describe("completion", () => {
     expect(r.err).toBe("");
     expect(r.out).toContain("#compdef devin-cli");
     expect(r.out).toContain("_describe");
-    for (const w of [...TOP_COMMANDS, ...CONSUMPTION_SUBCOMMANDS, ...METRIC_NAMES])
+    for (const w of [
+      ...TOP_COMMANDS,
+      ...CONSUMPTION_SUBCOMMANDS,
+      ...METRIC_NAMES,
+      ...SESSIONS_SUBCOMMANDS,
+    ])
       expect(r.out).toContain(w);
-    for (const o of ["--days", "--org", "--json"]) expect(r.out).toContain(o);
+    for (const o of ["--days", "--org", "--json", "--limit", "--prompt", "--yes"])
+      expect(r.out).toContain(o);
   });
 
   test("fish は complete -c のスクリプトを出す", async () => {
@@ -42,10 +65,16 @@ describe("completion", () => {
     expect(r.code).toBe(0);
     expect(r.err).toBe("");
     expect(r.out).toContain("complete -c devin-cli");
-    for (const w of [...TOP_COMMANDS, ...CONSUMPTION_SUBCOMMANDS, ...METRIC_NAMES])
+    for (const w of [
+      ...TOP_COMMANDS,
+      ...CONSUMPTION_SUBCOMMANDS,
+      ...METRIC_NAMES,
+      ...SESSIONS_SUBCOMMANDS,
+    ])
       expect(r.out).toContain(w);
     // fish は長いオプションを -l <名前> で書く
-    for (const o of ["-l days", "-l org", "-l json"]) expect(r.out).toContain(o);
+    for (const o of ["-l days", "-l org", "-l json", "-l limit", "-l prompt", "-l yes"])
+      expect(r.out).toContain(o);
   });
 
   test("対応しないシェル名は exit 2", async () => {
