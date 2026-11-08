@@ -159,7 +159,7 @@ describe("mergeFragments", () => {
     const m = mergeFragments([get, post]);
     const item = m.paths["/v3/a"];
     expect(item?.["parameters"]).toEqual(params);
-    expect(Object.keys(item ?? {}).sort()).toEqual(["get", "parameters", "post"]);
+    expect(Object.keys(item ?? {}).toSorted()).toEqual(["get", "parameters", "post"]);
   });
 
   test("path-item の非 method キーが fragment 間で内容不一致なら失敗", () => {
