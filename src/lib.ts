@@ -80,6 +80,38 @@ export async function send(url: string, init: RequestInit, ms: number) {
   return { status: res.status, statusText: res.statusText, ok: res.ok, headers: res.headers, raw };
 }
 
+// send のバイナリ版。attachment のダウンロード等、JSON でない応答をそのまま受け取る用。
+// proxy 判定は先頭だけを UTF-8 で読んで行う (HTML の検出に十分で、本文全体は decode しない)
+export async function sendBytes(url: string, init: RequestInit, ms: number) {
+  let res: Response;
+  let bytes: Uint8Array;
+  try {
+    res = await fetch(url, { ...init, signal: AbortSignal.timeout(ms) });
+    bytes = new Uint8Array(await res.arrayBuffer());
+  } catch (e) {
+    const timedOut = (e as Error).name === "TimeoutError";
+    throw new CommError(
+      timedOut
+        ? `Devin API が ${ms / 1000} 秒で応答しない: ${url}`
+        : `Devin API との通信に失敗: ${(e as Error).message}`,
+      timedOut,
+    );
+  }
+  const probe = new TextDecoder().decode(bytes.subarray(0, 512));
+  if (isProxyReply(res.status, probe))
+    throw new CommError(
+      `Devin API に届かなかった (HTTP ${res.status})。手前の proxy が返した応答で、Devin API 自身の返答ではない: ${url}`,
+      false,
+    );
+  return {
+    status: res.status,
+    statusText: res.statusText,
+    ok: res.ok,
+    headers: res.headers,
+    bytes,
+  };
+}
+
 type Config = { api_key_command?: string; org_id?: string; api_base_url?: string };
 function config(): Config {
   const base = process.env.XDG_CONFIG_HOME || join(homedir(), ".config");

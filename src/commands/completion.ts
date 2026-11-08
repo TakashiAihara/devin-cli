@@ -19,6 +19,13 @@ const TOP_COMMANDS = [
   "notes",
   "automations",
   "schedules",
+  "members",
+  "playbooks",
+  "pr-reviews",
+  "attachments",
+  "security-profiles",
+  "security-profile-settings",
+  "default-platform",
   "completion",
 ];
 const CONSUMPTION_SUBCOMMANDS = ["daily", "user", "service-user", "session"];
@@ -44,6 +51,13 @@ const AUTOMATIONS_SUBCOMMANDS = [
   "templates",
 ];
 const SCHEDULES_SUBCOMMANDS = ["list", "get", "create", "update", "delete"];
+const MEMBERS_SUBCOMMANDS = ["list", "get", "idp-users"];
+const PLAYBOOKS_SUBCOMMANDS = ["list", "get", "create", "update", "delete"];
+const PR_REVIEWS_SUBCOMMANDS = ["get", "create"];
+const ATTACHMENTS_SUBCOMMANDS = ["upload", "download"];
+const SECURITY_PROFILES_SUBCOMMANDS = ["list", "get", "create", "update", "delete"];
+const SECURITY_PROFILE_SETTINGS_SUBCOMMANDS = ["get", "update"];
+const DEFAULT_PLATFORM_SUBCOMMANDS = ["get", "set"];
 
 // repositories は list がリーフ、indexing / indexing-repo / indexing-branch が
 // さらにサブコマンドを持つ 3 段構成。snapshot も blueprints / builds の下にリーフがある
@@ -93,6 +107,17 @@ const AUTOMATIONS_OPTIONS =
   "--org --json --limit --search --creator --event-type --agent-type --enabled --disabled --name --run-as --trigger --prompt --template-id --metadata --body-json --body-file --security-profile-id";
 const SCHEDULES_OPTIONS =
   "--org --json --limit --name --prompt --schedule-type --frequency --interval-count --scheduled-at --agent --notify-on --platform --playbook-id --skill-plugin --skill-name --tags --slack-channel-id --slack-team-id --target-devin-id --bypass-approval --body-json --body-file --create-as-user-id --run-as-user-id --enabled --disabled";
+// org-resources 系。グループ内の全サブコマンドのオプション和集合 (notes/automations/schedules と同じ方式)
+const MEMBERS_OPTIONS = "--org --json --limit";
+const PLAYBOOKS_OPTIONS =
+  "--org --json --limit --include-enterprise --title --body --body-file --macro --structured-output-schema";
+const PR_REVIEWS_OPTIONS = "--org --json --commit-sha";
+const ATTACHMENTS_OPTIONS = "--org --json --out";
+const SECURITY_PROFILES_OPTIONS =
+  "--org --json --limit --name --enforcement-level --git-access-level --devin-mcp-read-only --remove-github-cli-token --mcp-server --clear-mcp-config --net-policy-json --slack-channel-access-json --teams-channel-access-json --slack-dm-scope --teams-dm-scope --teams-group-chat-scope";
+const SECURITY_PROFILE_SETTINGS_OPTIONS =
+  "--org --json --default --default-profile --automations-default --automations-default-profile";
+const DEFAULT_PLATFORM_OPTIONS = "--org --json --platform --outpost-pool-id --clear";
 
 // 値を取るオプション。直後の語では補完しない
 const VALUE_OPTIONS = [
@@ -159,6 +184,27 @@ const VALUE_OPTIONS = [
   "--position",
   "--build-on-default-branch",
   "--report-check-runs",
+  // org-resources 系 (members / playbooks / pr-reviews / attachments / security-profiles / default-platform)
+  "--macro",
+  "--structured-output-schema",
+  "--commit-sha",
+  "--out",
+  "--enforcement-level",
+  "--git-access-level",
+  "--devin-mcp-read-only",
+  "--remove-github-cli-token",
+  "--mcp-server",
+  "--net-policy-json",
+  "--slack-channel-access-json",
+  "--teams-channel-access-json",
+  "--slack-dm-scope",
+  "--teams-dm-scope",
+  "--teams-group-chat-scope",
+  "--default",
+  "--default-profile",
+  "--automations-default",
+  "--automations-default-profile",
+  "--outpost-pool-id",
 ];
 
 // bash: complete -F + compgen。値を取るオプションの直後では補完しない
@@ -250,6 +296,41 @@ _devin_cli() {
             opts="$opts ${SCHEDULES_OPTIONS}"
           fi
           ;;
+        members)
+          if [ "$COMP_CWORD" -ge 3 ]; then
+            opts="$opts ${MEMBERS_OPTIONS}"
+          fi
+          ;;
+        playbooks)
+          if [ "$COMP_CWORD" -ge 3 ]; then
+            opts="$opts ${PLAYBOOKS_OPTIONS}"
+          fi
+          ;;
+        pr-reviews)
+          if [ "$COMP_CWORD" -ge 3 ]; then
+            opts="$opts ${PR_REVIEWS_OPTIONS}"
+          fi
+          ;;
+        attachments)
+          if [ "$COMP_CWORD" -ge 3 ]; then
+            opts="$opts ${ATTACHMENTS_OPTIONS}"
+          fi
+          ;;
+        security-profiles)
+          if [ "$COMP_CWORD" -ge 3 ]; then
+            opts="$opts ${SECURITY_PROFILES_OPTIONS}"
+          fi
+          ;;
+        security-profile-settings)
+          if [ "$COMP_CWORD" -ge 3 ]; then
+            opts="$opts ${SECURITY_PROFILE_SETTINGS_OPTIONS}"
+          fi
+          ;;
+        default-platform)
+          if [ "$COMP_CWORD" -ge 3 ]; then
+            opts="$opts ${DEFAULT_PLATFORM_OPTIONS}"
+          fi
+          ;;
       esac
     fi
     COMPREPLY=($(compgen -W "$opts" -- "$cur"))
@@ -325,6 +406,41 @@ _devin_cli() {
     schedules)
       if [ "$COMP_CWORD" -eq 2 ]; then
         COMPREPLY=($(compgen -W "${SCHEDULES_SUBCOMMANDS.join(" ")}" -- "$cur"))
+      fi
+      ;;
+    members)
+      if [ "$COMP_CWORD" -eq 2 ]; then
+        COMPREPLY=($(compgen -W "${MEMBERS_SUBCOMMANDS.join(" ")}" -- "$cur"))
+      fi
+      ;;
+    playbooks)
+      if [ "$COMP_CWORD" -eq 2 ]; then
+        COMPREPLY=($(compgen -W "${PLAYBOOKS_SUBCOMMANDS.join(" ")}" -- "$cur"))
+      fi
+      ;;
+    pr-reviews)
+      if [ "$COMP_CWORD" -eq 2 ]; then
+        COMPREPLY=($(compgen -W "${PR_REVIEWS_SUBCOMMANDS.join(" ")}" -- "$cur"))
+      fi
+      ;;
+    attachments)
+      if [ "$COMP_CWORD" -eq 2 ]; then
+        COMPREPLY=($(compgen -W "${ATTACHMENTS_SUBCOMMANDS.join(" ")}" -- "$cur"))
+      fi
+      ;;
+    security-profiles)
+      if [ "$COMP_CWORD" -eq 2 ]; then
+        COMPREPLY=($(compgen -W "${SECURITY_PROFILES_SUBCOMMANDS.join(" ")}" -- "$cur"))
+      fi
+      ;;
+    security-profile-settings)
+      if [ "$COMP_CWORD" -eq 2 ]; then
+        COMPREPLY=($(compgen -W "${SECURITY_PROFILE_SETTINGS_SUBCOMMANDS.join(" ")}" -- "$cur"))
+      fi
+      ;;
+    default-platform)
+      if [ "$COMP_CWORD" -eq 2 ]; then
+        COMPREPLY=($(compgen -W "${DEFAULT_PLATFORM_SUBCOMMANDS.join(" ")}" -- "$cur"))
       fi
       ;;
     completion)
@@ -403,6 +519,27 @@ _devin_cli() {
         schedules)
           (( CURRENT >= 4 )) && candidates+=(${SCHEDULES_OPTIONS})
           ;;
+        members)
+          (( CURRENT >= 4 )) && candidates+=(${MEMBERS_OPTIONS})
+          ;;
+        playbooks)
+          (( CURRENT >= 4 )) && candidates+=(${PLAYBOOKS_OPTIONS})
+          ;;
+        pr-reviews)
+          (( CURRENT >= 4 )) && candidates+=(${PR_REVIEWS_OPTIONS})
+          ;;
+        attachments)
+          (( CURRENT >= 4 )) && candidates+=(${ATTACHMENTS_OPTIONS})
+          ;;
+        security-profiles)
+          (( CURRENT >= 4 )) && candidates+=(${SECURITY_PROFILES_OPTIONS})
+          ;;
+        security-profile-settings)
+          (( CURRENT >= 4 )) && candidates+=(${SECURITY_PROFILE_SETTINGS_OPTIONS})
+          ;;
+        default-platform)
+          (( CURRENT >= 4 )) && candidates+=(${DEFAULT_PLATFORM_OPTIONS})
+          ;;
       esac
     fi
   elif (( CURRENT == 2 )); then
@@ -418,6 +555,13 @@ _devin_cli() {
       notes) candidates=(${NOTES_SUBCOMMANDS.join(" ")}) ;;
       automations) candidates=(${AUTOMATIONS_SUBCOMMANDS.join(" ")}) ;;
       schedules) candidates=(${SCHEDULES_SUBCOMMANDS.join(" ")}) ;;
+      members) candidates=(${MEMBERS_SUBCOMMANDS.join(" ")}) ;;
+      playbooks) candidates=(${PLAYBOOKS_SUBCOMMANDS.join(" ")}) ;;
+      pr-reviews) candidates=(${PR_REVIEWS_SUBCOMMANDS.join(" ")}) ;;
+      attachments) candidates=(${ATTACHMENTS_SUBCOMMANDS.join(" ")}) ;;
+      security-profiles) candidates=(${SECURITY_PROFILES_SUBCOMMANDS.join(" ")}) ;;
+      security-profile-settings) candidates=(${SECURITY_PROFILE_SETTINGS_SUBCOMMANDS.join(" ")}) ;;
+      default-platform) candidates=(${DEFAULT_PLATFORM_SUBCOMMANDS.join(" ")}) ;;
       completion) candidates=(${SHELLS.join(" ")}) ;;
     esac
   elif (( CURRENT == 4 )); then
@@ -540,12 +684,51 @@ const GROUP_VALUE_OPTIONS: Record<string, string[]> = {
     "--limit",
     "--status",
   ],
+  members: ["--org", "--limit"],
+  playbooks: [
+    "--org",
+    "--limit",
+    "--title",
+    "--body",
+    "--body-file",
+    "--macro",
+    "--structured-output-schema",
+  ],
+  "pr-reviews": ["--org", "--commit-sha"],
+  attachments: ["--org", "--out"],
+  "security-profiles": [
+    "--org",
+    "--limit",
+    "--name",
+    "--enforcement-level",
+    "--git-access-level",
+    "--devin-mcp-read-only",
+    "--remove-github-cli-token",
+    "--mcp-server",
+    "--net-policy-json",
+    "--slack-channel-access-json",
+    "--teams-channel-access-json",
+    "--slack-dm-scope",
+    "--teams-dm-scope",
+    "--teams-group-chat-scope",
+  ],
+  "security-profile-settings": [
+    "--org",
+    "--default",
+    "--default-profile",
+    "--automations-default",
+    "--automations-default-profile",
+  ],
+  "default-platform": ["--org", "--platform", "--outpost-pool-id"],
 };
 const GROUP_BOOL_OPTIONS: Record<string, string[]> = {
   notes: ["--enabled", "--disabled", "--clear-folder", "--clear-pinned-repo"],
   automations: ["--enabled", "--disabled"],
   schedules: ["--enabled", "--disabled", "--bypass-approval"],
   snapshot: ["--active", "--yes"],
+  playbooks: ["--include-enterprise"],
+  "security-profiles": ["--clear-mcp-config"],
+  "default-platform": ["--clear"],
 };
 const groupValueOptions = (name: string): string[] => GROUP_VALUE_OPTIONS[name] ?? [];
 const groupBoolOptions = (name: string): string[] => GROUP_BOOL_OPTIONS[name] ?? [];
@@ -566,6 +749,13 @@ complete -c devin-cli -f -n '__fish_use_subcommand' -a 'sessions' -d 'Devin セ�
 complete -c devin-cli -f -n '__fish_use_subcommand' -a 'notes' -d 'knowledge notes (org scope)'
 complete -c devin-cli -f -n '__fish_use_subcommand' -a 'automations' -d 'automations (org scope)'
 complete -c devin-cli -f -n '__fish_use_subcommand' -a 'schedules' -d 'schedules (org scope、deprecated)'
+complete -c devin-cli -f -n '__fish_use_subcommand' -a 'members' -d 'org メンバー (v3beta1。list/get/idp-users)'
+complete -c devin-cli -f -n '__fish_use_subcommand' -a 'playbooks' -d 'org の playbook CRUD'
+complete -c devin-cli -f -n '__fish_use_subcommand' -a 'pr-reviews' -d 'PR review の起動・参照 (一覧 API は無く PR 単位)'
+complete -c devin-cli -f -n '__fish_use_subcommand' -a 'attachments' -d 'org attachments の upload/download'
+complete -c devin-cli -f -n '__fish_use_subcommand' -a 'security-profiles' -d 'org の security profile CRUD (v3beta1)'
+complete -c devin-cli -f -n '__fish_use_subcommand' -a 'security-profile-settings' -d 'org の security profile 既定値 (v3beta1)'
+complete -c devin-cli -f -n '__fish_use_subcommand' -a 'default-platform' -d '新規 session の既定 platform (v3beta1)'
 complete -c devin-cli -f -n '__fish_use_subcommand' -a 'completion' -d 'シェル補完スクリプトを stdout に出す'
 
 # consumption のサブコマンド (consumption の直後でのみ)
@@ -602,15 +792,29 @@ ${fishGroup("automations", AUTOMATIONS_SUBCOMMANDS)}
 
 ${fishGroup("schedules", SCHEDULES_SUBCOMMANDS)}
 
+${fishGroup("members", MEMBERS_SUBCOMMANDS)}
+
+${fishGroup("playbooks", PLAYBOOKS_SUBCOMMANDS)}
+
+${fishGroup("pr-reviews", PR_REVIEWS_SUBCOMMANDS)}
+
+${fishGroup("attachments", ATTACHMENTS_SUBCOMMANDS)}
+
+${fishGroup("security-profiles", SECURITY_PROFILES_SUBCOMMANDS)}
+
+${fishGroup("security-profile-settings", SECURITY_PROFILE_SETTINGS_SUBCOMMANDS)}
+
+${fishGroup("default-platform", DEFAULT_PLATFORM_SUBCOMMANDS)}
+
 # completion のシェル名
 complete -c devin-cli -f -n '__fish_seen_subcommand_from completion' -a '${SHELLS.join(" ")}'
 
 # オプション。self は --json のみ、billing / consumption の各サブコマンド / metrics は --days --org --json
 complete -c devin-cli -s h -l help -d 'display help for command'
 complete -c devin-cli -s V -l version -d 'output the version number' -n 'not __fish_seen_subcommand_from ${TOP_COMMANDS.join(" ")}'
-complete -c devin-cli -l json -d 'TSV ではなく JSON を stdout に出す' -n '__fish_seen_subcommand_from self billing metrics repositories code-scans snapshot sessions notes automations schedules; or __fish_seen_subcommand_from ${CONSUMPTION_SUBCOMMANDS.join(" ")}'
+complete -c devin-cli -l json -d 'TSV ではなく JSON を stdout に出す' -n '__fish_seen_subcommand_from self billing metrics repositories code-scans snapshot sessions notes automations schedules members playbooks pr-reviews attachments security-profiles security-profile-settings default-platform; or __fish_seen_subcommand_from ${CONSUMPTION_SUBCOMMANDS.join(" ")}'
 complete -c devin-cli -l days -x -d '直近 N 暦日' -n '__fish_seen_subcommand_from billing metrics; or __fish_seen_subcommand_from ${CONSUMPTION_SUBCOMMANDS.join(" ")}'
-complete -c devin-cli -l org -x -d 'org ID (省略時は自動解決)' -n '__fish_seen_subcommand_from billing metrics repositories code-scans snapshot sessions notes automations schedules; or __fish_seen_subcommand_from ${CONSUMPTION_SUBCOMMANDS.join(" ")}'
+complete -c devin-cli -l org -x -d 'org ID (省略時は自動解決)' -n '__fish_seen_subcommand_from billing metrics repositories code-scans snapshot sessions notes automations schedules members playbooks pr-reviews attachments security-profiles security-profile-settings default-platform; or __fish_seen_subcommand_from ${CONSUMPTION_SUBCOMMANDS.join(" ")}'
 
 # sessions list / insights のフィルタと --limit
 complete -c devin-cli -l limit -x -d '出力する最大件数' -n '__fish_seen_subcommand_from list insights'
