@@ -45,6 +45,23 @@ echo 'source ~/.devin-cli-completion.bash' >> ~/.bashrc
 | `consumption service-user <id> [--days N]` | service user の日次消費 |
 | `consumption session <id> [--days N]` | session の日次消費 |
 | `metrics <name> [--days N]` | `usage` / `sessions` / `prs` / `searches` / `dau` / `wau` / `mau` / `active-users` |
+| `members list [--limit N]` | org メンバー一覧（v3beta1。cursor pagination、`--limit` で件数上限） |
+| `members get <user_id>` | メンバー詳細（直接 + IDP 由来の role） |
+| `members idp-users [--limit N]` | IDP グループ由来のメンバー一覧 |
+| `playbooks list [--limit N] [--include-enterprise]` | playbook 一覧 |
+| `playbooks get <id>` | playbook 詳細 |
+| `playbooks create --title T --body B [--macro M] [--structured-output-schema J]` | playbook 作成（`--body-file <path>` でも可。`-` で stdin） |
+| `playbooks update <id> ...` | playbook 更新（PUT。title/body は全項目置き換えなので必須） |
+| `playbooks delete <id>` | playbook 削除 |
+| `pr-reviews get <pr_url> [--commit-sha S]` | PR の最新 Devin Review を取得（一覧 API は無い） |
+| `pr-reviews create <pr_url>` | PR の review を起動 |
+| `attachments upload <file>` | ファイルを attachment としてアップロード（multipart） |
+| `attachments download <uuid> <name> [--out F]` | attachment をダウンロード（`--out` 省略時はバイナリを stdout に出す） |
+| `security-profiles list/get/create/update/delete` | org の security profile CRUD（v3beta1。update は指定項目だけ PATCH） |
+| `security-profile-settings get` | 既定 security profile（default / automations_default） |
+| `security-profile-settings update` | 既定値を更新（`--default` / `--automations-default` に inherit/none/profile） |
+| `default-platform get` | 新規 session の既定 platform |
+| `default-platform set (--platform L \| --outpost-pool-id ID \| --clear)` | 既定 platform を設定・解除 |
 | `completion <shell>` | bash / zsh / fish 向けの補完スクリプトを stdout に出す |
 
 `--org <id>` で org を明示できる。省略時は `--org` > `DEVIN_ORG_ID` > config `org_id` > `GET /v3/self` の順で解決する。
