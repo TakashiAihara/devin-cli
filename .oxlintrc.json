@@ -1,3 +1,11 @@
 {
-  "ignorePatterns": ["src/generated/**"]
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "categories": {
+    "correctness": "error",
+    "suspicious": "error"
+  },
+  "ignorePatterns": ["src/generated/**"],
+  "rules": {
+    "no-underscore-dangle": ["error", { "allow": ["__BUILD_VERSION__"] }]
+  }
 }

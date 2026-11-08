@@ -14,7 +14,7 @@ export type ConsumptionOptions = { days: number; org?: string; json: boolean };
 // 日別 TSV。billing の日別セクションとも共用する
 export function dailyLines(res: ConsumptionResponse): string[] {
   const lines = ["date\tacus\tdevin\tcascade\tterminal\tautomation\treview"];
-  const rows = [...res.consumption_by_date].sort((a, b) => a.date - b.date);
+  const rows = res.consumption_by_date.toSorted((a, b) => a.date - b.date);
   for (const d of rows) {
     const p = d.acus_by_product;
     lines.push(

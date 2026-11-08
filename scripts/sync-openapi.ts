@@ -49,7 +49,7 @@ function canonical(v: unknown): string {
   if (Array.isArray(v)) return `[${v.map(canonical).join(",")}]`;
   const o = v as Record<string, unknown>;
   return `{${Object.keys(o)
-    .sort()
+    .toSorted()
     .map((k) => `${JSON.stringify(k)}:${canonical(o[k])}`)
     .join(",")}}`;
 }
@@ -129,7 +129,7 @@ export function normalizeOperationId(method: string, path: string): string {
 }
 
 const sortKeys = <T>(o: Record<string, T>): Record<string, T> =>
-  Object.fromEntries(Object.entries(o).sort(([a], [b]) => a.localeCompare(b)));
+  Object.fromEntries(Object.entries(o).toSorted(([a], [b]) => a.localeCompare(b)));
 
 export function buildDocument(merged: MergedSpec): Record<string, unknown> {
   const paths: Record<string, Record<string, unknown>> = {};
