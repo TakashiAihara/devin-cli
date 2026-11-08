@@ -27,6 +27,13 @@ bun run start -- metrics usage --days 30
 
 グローバルに使いたい場合は `bun link` するか `bun build --compile` でバイナリを作る（リリースバイナリ配布は今後対応）。
 
+シェル補完は `devin-cli completion bash|zsh|fish` でスクリプトを出力できる。例 (bash):
+
+```sh
+devin-cli completion bash > ~/.devin-cli-completion.bash
+echo 'source ~/.devin-cli-completion.bash' >> ~/.bashrc
+```
+
 ## コマンド
 
 | コマンド | 説明 |
@@ -38,6 +45,7 @@ bun run start -- metrics usage --days 30
 | `consumption service-user <id> [--days N]` | service user の日次消費 |
 | `consumption session <id> [--days N]` | session の日次消費 |
 | `metrics <name> [--days N]` | `usage` / `sessions` / `prs` / `searches` / `dau` / `wau` / `mau` / `active-users` |
+| `completion <shell>` | bash / zsh / fish 向けの補完スクリプトを stdout に出す |
 
 `--org <id>` で org を明示できる。省略時は `--org` > `DEVIN_ORG_ID` > config `org_id` > `GET /v3/self` の順で解決する。
 
