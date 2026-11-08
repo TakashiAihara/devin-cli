@@ -38,14 +38,22 @@ api_key_command / org_id / api_base_url が書ける。秘密の平文は書け�
 `,
 );
 
+// consumption / metrics とも API 側の上限は 100 日 (実測: 超えると 422)
+const MAX_DAYS = 100;
 const days = (value: string): number => {
   const n = Number(value);
-  if (!Number.isSafeInteger(n) || n < 1) throw new InvalidArgumentError("1 以上の整数を指定する");
+  if (!Number.isSafeInteger(n) || n < 1 || n > MAX_DAYS)
+    throw new InvalidArgumentError(`1〜${MAX_DAYS} の整数を指定する`);
   return n;
 };
 
 const daysOption = () =>
-  new Option("--days <n>", "直近 N 暦日 (UTC-8 日境界、今日を含む)").argParser(days).default(30);
+  new Option(
+    "--days <n>",
+    "直近 N 暦日 (今日を含む。consumption は UTC-8、metrics は UTC の日境界)",
+  )
+    .argParser(days)
+    .default(30);
 const orgOption = () => new Option("--org <id>", "org ID (省略時は自動解決)");
 
 program

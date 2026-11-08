@@ -67,9 +67,11 @@ export const METRICS_PRS = {
 
 export const METRICS_SEARCHES = { searches_created_count: 34 };
 
+// metrics のバケットは UTC 日 (実測: start_time % 86400 === 0)。00:00Z 起点なので
+// UTC-8 で整形すると 1 日ずれる — この fixture がその誤りを検出できる
 export const METRICS_ACTIVE_USERS = [
-  { start_time: 1767254400, end_time: 1767340799, active_users: 2 }, // → 2026-01-01..2026-01-01
-  { start_time: 1767340800, end_time: 1767427199, active_users: 3 }, // → 2026-01-02..2026-01-02
+  { start_time: 1767225600, end_time: 1767311999, active_users: 2 }, // 2026-01-01T00:00Z..23:59:59Z
+  { start_time: 1767312000, end_time: 1767398399, active_users: 3 }, // 2026-01-02T00:00Z..23:59:59Z
 ];
 
 export const PROBLEM = (status: number, detail: string) => ({

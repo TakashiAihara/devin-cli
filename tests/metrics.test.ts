@@ -29,11 +29,11 @@ describe("metrics", () => {
     expect(row).toBe("5\t4\t3\t1\t2\t1\t1\t0");
   });
 
-  test("dau は時系列の行", async () => {
+  test("dau は時系列の行 (バケット日付は UTC 日)", async () => {
     const r = await ctx.run(["metrics", "dau", "--org", "org-x"]);
     expect(r.code).toBe(0);
-    // 1767254400 = 2026-01-01T08:00Z → UTC-8 2026-01-01、1767340799 = 2026-01-02T07:59:59Z → UTC-8 2026-01-01
-    // 1767340800 = 2026-01-02T08:00Z → UTC-8 2026-01-02、1767427199 = 2026-01-03T07:59:59Z → UTC-8 2026-01-02
+    // fixture は UTC 日バケット (00:00Z..23:59:59Z)。UTC-8 で整形すると前日にずれるので
+    // "2026-01-01" と出ることが UTC 整形の証明になる
     expect(r.out).toBe(
       tsv(
         "start_time\tend_time\tactive_users",
@@ -63,12 +63,15 @@ describe("metrics", () => {
     expect(lines).toContain("by_size_merged_prs\tl\t0");
   });
 
-  test("正しい path に time_after/time_before を付けて叩く", async () => {
+  test("正しい path に UTC 日境界の time_after/time_before を付けて叩く", async () => {
     await ctx.run(["metrics", "usage", "--org", "org-x", "--days", "7"]);
     const call = ctx.fake.log.find((l) => l.path === "/v3/organizations/org-x/metrics/usage");
     expect(call).toBeDefined();
-    expect(call?.query.get("time_after")).not.toBeNull();
-    expect(call?.query.get("time_before")).not.toBeNull();
+    const after = Number(call?.query.get("time_after"));
+    const before = Number(call?.query.get("time_before"));
+    expect(after % 86400).toBe(0); // metrics の窓は UTC 0 時境界
+    expect(before - after).toBeGreaterThanOrEqual(6 * 86400);
+    expect(before - after).toBeLessThan(8 * 86400);
   });
 
   test("--json は生 JSON", async () => {

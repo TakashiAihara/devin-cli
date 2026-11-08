@@ -1,4 +1,4 @@
-import { consumptionWindow, formatDateUtc8 } from "../dates.ts";
+import { formatDateUtc, metricsWindow } from "../dates.ts";
 import {
   metricsActiveUsers,
   metricsDau,
@@ -96,15 +96,13 @@ const sessionsLines = (s: SessionMetricsResponse): string[] => {
 const activeUserLines = (rows: ActiveUserMetrics[]): string[] => {
   const lines = ["start_time\tend_time\tactive_users"];
   for (const r of rows)
-    lines.push(
-      [formatDateUtc8(r.start_time), formatDateUtc8(r.end_time), r.active_users].join("\t"),
-    );
+    lines.push([formatDateUtc(r.start_time), formatDateUtc(r.end_time), r.active_users].join("\t"));
   return lines;
 };
 
 export const runMetrics = guard(async (o: MetricsOptions) => {
   const orgId = await resolveOrgId(o.org);
-  const win = consumptionWindow(o.days, new Date());
+  const win = metricsWindow(o.days, new Date());
   switch (o.name) {
     case "usage": {
       const res = await metricsUsage(orgId, win);

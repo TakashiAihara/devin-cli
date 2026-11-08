@@ -102,7 +102,12 @@ export function apiBaseUrl(): string {
   const u = process.env.DEVIN_API_BASE_URL || config().api_base_url || "https://api.devin.ai";
   // scheme の無い値は proxy 越しだと 502 の HTML が返り、通信の失敗ではなく相手の否に見える
   if (!/^https?:\/\//.test(u)) return die(`api_base_url は http:// か https:// で始める: ${u}`, 2);
-  const url = new URL(u);
+  let url: URL;
+  try {
+    url = new URL(u);
+  } catch {
+    return die(`api_base_url を URL として読めない: ${u}`, 2);
+  }
   // path 付きの base は endpoint の path と二重になるので origin のみに限定する
   if (url.pathname !== "/") return die(`api_base_url は origin のみ (path は含めない): ${u}`, 2);
   return `${url.protocol}//${url.host}`;
@@ -124,7 +129,8 @@ function killGroup(pid: number): void {
   // 0 は自分のグループ、負の値は別の番号 (−1 なら全プロセス)。子の pid は自分の pid と同じにならない
   if (pid <= 1 || pid === process.pid) return;
   try {
-    // 0 で居ることを確かめてから止める。空のグループは pgid を再利用されうるので、その場合は何もしない
+    // 存在確認は ESRCH を避けるためだけ。pgid が再利用されているかまでは区別できないが、
+    // 直下の子の終了直後に呼ぶのでその窓は実質無い
     process.kill(-pid, 0);
     process.kill(-pid, "SIGKILL");
   } catch {
@@ -223,26 +229,6 @@ export async function secret(name: string): Promise<string> {
     return die(`${name} を ${key} から取れない (exit ${r.code}) ${why}`.trimEnd(), 2);
   if (/[\r\n]/.test(out)) return die(`${name} として複数行が返った。値には使わない`, 2);
   return out;
-}
-
-// ProblemDetail (RFC 9457) または旧式 {"detail": ...} / {"error": ...} から表示用文字列を取る
-export function problemText(raw: string): string {
-  try {
-    const o = JSON.parse(raw) as Record<string, unknown>;
-    for (const k of ["detail", "title"] as const) {
-      const v = o?.[k];
-      if (typeof v === "string" && v) return v;
-    }
-    const err = o?.error;
-    if (typeof err === "string" && err) return err;
-    if (err && typeof err === "object") {
-      const m = (err as Record<string, unknown>).message;
-      if (typeof m === "string" && m) return m;
-    }
-    return raw;
-  } catch {
-    return raw;
-  }
 }
 
 export const oneLine = (s: string) => s.replace(/[\r\n\t]+/g, " ");

@@ -27,21 +27,27 @@ export type ActiveUserMetricsList = Awaited<ReturnType<typeof genMetricsDau>>;
 export type ActiveUserMetrics = Awaited<ReturnType<typeof genMetricsActiveUsers>>;
 
 const w = (win: Window) => ({ time_after: win.time_after, time_before: win.time_before });
+// 生成コードは path param を素で埋め込むので、こちらで encode して `..` や `?` による
+// path の書き換え・query 化を防ぐ (encode しても通常の ID は変化しない)
+const enc = encodeURIComponent;
 
 export const apiSelf = () => genSelf();
-export const consumptionDaily = (orgId: string, win: Window) => genConsumptionDaily(orgId, w(win));
+export const consumptionDaily = (orgId: string, win: Window) =>
+  genConsumptionDaily(enc(orgId), w(win));
 export const consumptionDailyUser = (orgId: string, userId: string, win: Window) =>
-  genConsumptionDailyUser(orgId, userId, w(win));
+  genConsumptionDailyUser(enc(orgId), enc(userId), w(win));
 export const consumptionDailyServiceUser = (orgId: string, serviceUserId: string, win: Window) =>
-  genConsumptionDailyServiceUser(orgId, serviceUserId, w(win));
+  genConsumptionDailyServiceUser(enc(orgId), enc(serviceUserId), w(win));
 export const consumptionDailySession = (orgId: string, sessionId: string, win: Window) =>
-  genConsumptionDailySession(orgId, sessionId, w(win));
-export const metricsUsage = (orgId: string, win: Window) => genMetricsUsage(orgId, w(win));
-export const metricsSessions = (orgId: string, win: Window) => genMetricsSessions(orgId, w(win));
-export const metricsPrs = (orgId: string, win: Window) => genMetricsPrs(orgId, w(win));
-export const metricsSearches = (orgId: string, win: Window) => genMetricsSearches(orgId, w(win));
-export const metricsDau = (orgId: string, win: Window) => genMetricsDau(orgId, w(win));
-export const metricsWau = (orgId: string, win: Window) => genMetricsWau(orgId, w(win));
-export const metricsMau = (orgId: string, win: Window) => genMetricsMau(orgId, w(win));
+  genConsumptionDailySession(enc(orgId), enc(sessionId), w(win));
+export const metricsUsage = (orgId: string, win: Window) => genMetricsUsage(enc(orgId), w(win));
+export const metricsSessions = (orgId: string, win: Window) =>
+  genMetricsSessions(enc(orgId), w(win));
+export const metricsPrs = (orgId: string, win: Window) => genMetricsPrs(enc(orgId), w(win));
+export const metricsSearches = (orgId: string, win: Window) =>
+  genMetricsSearches(enc(orgId), w(win));
+export const metricsDau = (orgId: string, win: Window) => genMetricsDau(enc(orgId), w(win));
+export const metricsWau = (orgId: string, win: Window) => genMetricsWau(enc(orgId), w(win));
+export const metricsMau = (orgId: string, win: Window) => genMetricsMau(enc(orgId), w(win));
 export const metricsActiveUsers = (orgId: string, win: Window) =>
-  genMetricsActiveUsers(orgId, w(win));
+  genMetricsActiveUsers(enc(orgId), w(win));

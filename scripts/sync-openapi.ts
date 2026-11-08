@@ -165,7 +165,7 @@ export function buildDocument(merged: MergedSpec): Record<string, unknown> {
 }
 
 async function fetchText(url: string): Promise<string> {
-  const res = await fetch(url);
+  const res = await fetch(url, { signal: AbortSignal.timeout(30_000) });
   if (!res.ok) throw new Error(`${url}: HTTP ${res.status}`);
   return res.text();
 }
