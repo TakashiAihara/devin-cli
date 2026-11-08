@@ -34,6 +34,13 @@ describe("billing", () => {
     expect((body.window.time_after - 8 * 3600) % 86400).toBe(0);
   });
 
+  test("--days 101 は API を叩かず exit 2 (上限 100 日)", async () => {
+    const r = await ctx.run(["billing", "--org", "org-x", "--days", "101"]);
+    expect(r.code).toBe(2);
+    expect(r.err).toContain("100");
+    expect(ctx.fake.log.filter((l) => l.path.includes("consumption"))).toHaveLength(0);
+  });
+
   test("time_after/time_before が fake に届く", async () => {
     await ctx.run(["billing", "--org", "org-x", "--days", "7"]);
     const call = ctx.fake.log.find((l) => l.path === "/v3/organizations/org-x/consumption/daily");

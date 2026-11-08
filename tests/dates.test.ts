@@ -1,5 +1,12 @@
 import { describe, expect, test } from "bun:test";
-import { consumptionWindow, formatDateUtc8, utc8DayStart } from "../src/dates.ts";
+import {
+  consumptionWindow,
+  formatDateUtc,
+  formatDateUtc8,
+  metricsWindow,
+  utc8DayStart,
+  utcDayStart,
+} from "../src/dates.ts";
 
 const at = (iso: string) => Math.floor(Date.parse(iso) / 1000);
 
@@ -46,11 +53,42 @@ describe("consumptionWindow", () => {
   });
 });
 
+describe("metricsWindow (UTC 日境界)", () => {
+  const now = new Date("2026-11-06T05:00:00Z"); // UTC では 11-06、UTC-8 ではまだ 11-05
+
+  test("days=1 は UTC 今日 0 時〜現在", () => {
+    const w = metricsWindow(1, now);
+    expect(w.time_after).toBe(at("2026-11-06T00:00:00Z"));
+    expect(w.time_before).toBe(at("2026-11-06T05:00:00Z"));
+  });
+
+  test("days=7 は UTC 今日を含む 7 暦日", () => {
+    const w = metricsWindow(7, now);
+    expect(w.time_after).toBe(at("2026-10-31T00:00:00Z"));
+    expect(w.time_before).toBe(at("2026-11-06T05:00:00Z"));
+  });
+
+  test("consumptionWindow と違い UTC-8 早朝でも UTC の日付で切る", () => {
+    // 2026-11-06T05:00Z は UTC-8 では 11-05 だが、metrics の「今日」は UTC の 11-06
+    expect(metricsWindow(1, now).time_after).not.toBe(consumptionWindow(1, now).time_after);
+    expect(utcDayStart(at("2026-11-06T05:00:00Z"))).toBe(at("2026-11-06T00:00:00Z"));
+  });
+});
+
 describe("formatDateUtc8", () => {
   test("Unix 秒を UTC-8 の YYYY-MM-DD にする", () => {
     // 2026-01-01T08:00:00Z = UTC-8 の 2026-01-01 0 時
     expect(formatDateUtc8(at("2026-01-01T08:00:00Z"))).toBe("2026-01-01");
     // 2026-01-01T07:59:59Z = UTC-8 の 2025-12-31 23:59:59
     expect(formatDateUtc8(at("2026-01-01T07:59:59Z"))).toBe("2025-12-31");
+  });
+});
+
+describe("formatDateUtc", () => {
+  test("Unix 秒を UTC の YYYY-MM-DD にする (metrics バケット用)", () => {
+    // UTC 日バケットの開始 00:00Z は UTC-8 では前日になるので、こちらは前日にずれない
+    expect(formatDateUtc(at("2026-01-01T00:00:00Z"))).toBe("2026-01-01");
+    expect(formatDateUtc(at("2026-01-01T23:59:59Z"))).toBe("2026-01-01");
+    expect(formatDateUtc8(at("2026-01-01T00:00:00Z"))).toBe("2025-12-31"); // 対比: UTC-8 だとずれる
   });
 });

@@ -63,6 +63,12 @@ org_id = "org-..."
 api_base_url = "https://api.devin.ai"
 ```
 
+machine identity や secret manager の wrapper 経由で env に注入し、1 本だけ取り出す形でもよい（コマンドの stdout に秘密だけが出ること）:
+
+```toml
+api_key_command = "op read op://Private/devin-api-key/credential"  # 1Password CLI の例
+```
+
 秘密の平文を書くキーは無い。env が `*_command` より優先される。
 
 ## 権限
@@ -70,11 +76,12 @@ api_base_url = "https://api.devin.ai"
 - consumption 系: `ViewOrgConsumption`
 - metrics 系: `ViewOrgMetrics`
 
-PAT / service user に権限を付けて発行する。Pro plan (self-serve) では org scope の consumption は使えるが、enterprise scope (`/v3/enterprise/*`) は 403 になる。また metrics の org endpoint はプラン対応が未確認のため、403 が出たら権限不足かプラン非対応かを `detail` で確認する。
+PAT / service user に権限を付けて発行する。Pro plan (self-serve) では org scope の consumption / metrics ともに動作確認済み。enterprise scope (`/v3/enterprise/*`) は 403 になる。`--days` の上限は 100（consumption / metrics とも。CLI 側でも検査する）。
 
 ## 日付の扱い
 
-consumption / metrics の日境界は UTC-8 固定（Devin docs の "midnight PST" = 08:00 UTC）。`--days N` は今日を含む N 暦日で、`time_after` は UTC-8 の日境界に揃う。`date` フィールドは `YYYY-MM-DD`（UTC-8）で表示する。
+- **consumption**: 日境界は UTC-8 固定（Devin docs の "midnight PST" = 08:00 UTC。夏時間には従わない）。`--days N` は今日を含む N 暦日で、`time_after` は UTC-8 の日境界に揃う。`date` フィールドは `YYYY-MM-DD`（UTC-8）で表示する
+- **metrics**: バケットは UTC 日（実測: `start_time` が 00:00:00Z 起点）。`--days N` の窓も UTC 0 時に揃え、`dau`/`wau`/`mau`/`active-users` の日付は UTC の `YYYY-MM-DD` で表示する
 
 ## 開発
 
