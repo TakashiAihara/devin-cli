@@ -289,6 +289,75 @@ export const CODE_SCAN_PROFILE_DETAIL = {
   validation_severities: ["critical", "high"],
 };
 
+// --- snapshot-setup (org scope) ---
+
+export const SNAPSHOT_BLUEPRINT_ORG = {
+  blueprint_id: "bp-org-1",
+  build_on_default_branch_commit: null,
+  created_at: 1767225600,
+  repo_name: null,
+  report_check_runs: null,
+  source: null,
+  type: "org",
+  updated_at: 1767312000,
+};
+
+export const SNAPSHOT_BLUEPRINT_REPO = {
+  blueprint_id: "bp-repo-1",
+  build_on_default_branch_commit: true,
+  created_at: 1767225600,
+  repo_name: "acme/one",
+  report_check_runs: false,
+  source: "database",
+  type: "repo",
+  updated_at: 1767312000,
+};
+
+export const SNAPSHOT_BLUEPRINT_LIST = { data: [SNAPSHOT_BLUEPRINT_ORG, SNAPSHOT_BLUEPRINT_REPO] };
+
+export const SNAPSHOT_PRESIGNED = {
+  expires_at: 1767400000,
+  url: "https://files.example.com/presigned/blueprint.yaml",
+};
+
+export const SNAPSHOT_BLUEPRINT_FILE = {
+  blueprint_id: "bp-org-1",
+  created_at: 1767225600,
+  env_var_name: "NPM_TOKEN",
+  file_id: "bf-1",
+  name: "npm-token.txt",
+  size_bytes: 42,
+  updated_at: 1767312000,
+};
+
+export const SNAPSHOT_BLUEPRINT_FILE_LIST = { data: [SNAPSHOT_BLUEPRINT_FILE] };
+
+export const SNAPSHOT_BUILD = {
+  build_id: "build-1",
+  completed_at: 1767312000,
+  created_at: 1767225600,
+  pinned: true,
+  started_at: 1767225700,
+  status: "succeeded",
+  trigger: "manual",
+  triggered_by_user_id: "user-1",
+  updated_at: 1767312000,
+};
+
+// after=cur-2 で 2 ページ目を返す cursor pagination の fixture
+export const SNAPSHOT_BUILDS_PAGE1 = {
+  items: [SNAPSHOT_BUILD],
+  end_cursor: "cur-2",
+  has_next_page: true,
+  total: 2,
+};
+export const SNAPSHOT_BUILDS_PAGE2 = {
+  items: [{ ...SNAPSHOT_BUILD, build_id: "build-2", status: "running", pinned: false }],
+  end_cursor: null,
+  has_next_page: false,
+  total: 2,
+};
+
 const PROXY_PAGE = `<!DOCTYPE html>
 <html><head><title>502 Bad Gateway</title></head>
 <body><center><h1>502 Bad Gateway</h1></center><hr><center>nginx</center></body></html>
@@ -433,6 +502,57 @@ export function startFake(options: FakeOptions = {}): Fake {
         u.pathname,
       );
       if (profileMatch && req.method === "GET") return Response.json(CODE_SCAN_PROFILE_DETAIL);
+
+      // snapshot-setup (org scope)
+      if (/^\/v3\/organizations\/[^/]+\/snapshot-setup\/blueprints$/.test(u.pathname)) {
+        if (req.method === "GET") return Response.json(SNAPSHOT_BLUEPRINT_LIST);
+        if (req.method === "POST") return Response.json(SNAPSHOT_BLUEPRINT_ORG, { status: 201 });
+      }
+      const blueprintSub =
+        /^\/v3\/organizations\/[^/]+\/snapshot-setup\/blueprints\/([^/]+)\/(contents|files)(?:\/([^/]+))?$/.exec(
+          u.pathname,
+        );
+      if (blueprintSub) {
+        const [, , sub, fileId] = blueprintSub;
+        if (sub === "contents" && req.method === "GET") return Response.json(SNAPSHOT_PRESIGNED);
+        if (sub === "files" && !fileId) {
+          if (req.method === "GET") return Response.json(SNAPSHOT_BLUEPRINT_FILE_LIST);
+          if (req.method === "POST") return Response.json(SNAPSHOT_BLUEPRINT_FILE, { status: 201 });
+        }
+        if (sub === "files" && fileId && req.method === "DELETE")
+          return new Response(null, { status: 204 });
+      }
+      const blueprintMatch =
+        /^\/v3\/organizations\/[^/]+\/snapshot-setup\/blueprints\/([^/]+)$/.exec(u.pathname);
+      if (blueprintMatch) {
+        if (req.method === "GET") return Response.json(SNAPSHOT_BLUEPRINT_ORG);
+        if (req.method === "PATCH") return Response.json(SNAPSHOT_BLUEPRINT_ORG);
+        if (req.method === "DELETE") return new Response(null, { status: 204 });
+      }
+      if (/^\/v3\/organizations\/[^/]+\/snapshot-setup\/builds$/.test(u.pathname)) {
+        if (req.method === "GET") {
+          const after = u.searchParams.get("after");
+          return Response.json(after === "cur-2" ? SNAPSHOT_BUILDS_PAGE2 : SNAPSHOT_BUILDS_PAGE1);
+        }
+        if (req.method === "POST") return Response.json(SNAPSHOT_BUILD, { status: 201 });
+      }
+      const buildSub =
+        /^\/v3\/organizations\/[^/]+\/snapshot-setup\/builds\/([^/]+)\/(logs|cancel|pin)$/.exec(
+          u.pathname,
+        );
+      if (buildSub) {
+        const [, , sub] = buildSub;
+        if (sub === "logs" && req.method === "GET") return Response.json(SNAPSHOT_PRESIGNED);
+        if (sub === "cancel" && req.method === "POST") return Response.json(SNAPSHOT_BUILD);
+        if (sub === "pin") {
+          if (req.method === "POST") return Response.json(SNAPSHOT_BUILD);
+          if (req.method === "DELETE") return new Response(null, { status: 204 });
+        }
+      }
+      const buildMatch = /^\/v3\/organizations\/[^/]+\/snapshot-setup\/builds\/([^/]+)$/.exec(
+        u.pathname,
+      );
+      if (buildMatch && req.method === "GET") return Response.json(SNAPSHOT_BUILD);
 
       return Response.json(PROBLEM(404, "no route"), { status: 404 });
     },

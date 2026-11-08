@@ -26,6 +26,24 @@ import {
   runCodeScanProfiles,
   runCodeScanScans,
 } from "./commands/code-scans.ts";
+import {
+  runSnapshotBlueprintContents,
+  runSnapshotBlueprintCreate,
+  runSnapshotBlueprintDelete,
+  runSnapshotBlueprintFileDelete,
+  runSnapshotBlueprintFileUpload,
+  runSnapshotBlueprintFilesList,
+  runSnapshotBlueprintGet,
+  runSnapshotBlueprintsList,
+  runSnapshotBlueprintUpdate,
+  runSnapshotBuildCancel,
+  runSnapshotBuildCreate,
+  runSnapshotBuildGet,
+  runSnapshotBuildLogs,
+  runSnapshotBuildPin,
+  runSnapshotBuildsList,
+  runSnapshotBuildUnpin,
+} from "./commands/snapshot.ts";
 import { VERSION } from "./version.ts";
 
 const JSON_FLAG = "--json";
@@ -68,6 +86,13 @@ const days = (value: string): number => {
 const limit = (value: string): number => {
   const n = Number(value);
   if (!Number.isSafeInteger(n) || n < 1) throw new InvalidArgumentError("1 以上の整数を指定する");
+  return n;
+};
+
+// --position 用。符号は問わず整数のみ検査する
+const intValue = (value: string): number => {
+  const n = Number(value);
+  if (!Number.isSafeInteger(n)) throw new InvalidArgumentError("整数を指定する");
   return n;
 };
 
@@ -116,6 +141,28 @@ const SCAN_TYPES = [
   "general",
   "migration-docs",
 ];
+
+// snapshot-setup 用のオプション
+const BUILD_STATUSES = ["pending", "running", "succeeded", "failed", "cancelled"];
+const BLUEPRINT_SOURCES = ["git", "database"];
+const repoNameOption = () => new Option("--repo <name>", "repo 名 (例: org/repo)");
+const sourceOption = () =>
+  new Option(
+    "--source <mode>",
+    "blueprint のソース (git は repo の .devin/blueprint.yaml)",
+  ).choices(BLUEPRINT_SOURCES);
+const contentsOption = () => new Option("--contents <yaml>", "blueprint YAML 本文");
+const contentsFileOption = () =>
+  new Option("--contents-file <path>", "blueprint YAML をファイルから読む");
+const positionOption = () =>
+  new Option("--position <n>", "repo-tier blueprint の実行位置").argParser(intValue);
+// PATCH の真偽値は「未指定 / true / false」の 3 状態が必要なので値を取るオプションにする
+const boolValueOption = (flag: string, desc: string) =>
+  new Option(flag, desc).argParser((value: string) => {
+    if (value === "true") return true;
+    if (value === "false") return false;
+    throw new InvalidArgumentError("true か false を指定する");
+  });
 
 program
   .command("self")
@@ -460,6 +507,293 @@ codeScans
       );
     },
   );
+
+const snapshot = program
+  .command("snapshot")
+  .description("snapshot-setup の blueprints / builds (org scope)");
+
+const blueprints = snapshot
+  .command("blueprints")
+  .description("snapshot blueprint の CRUD (GET/POST/PATCH/DELETE /snapshot-setup/blueprints)");
+
+blueprints
+  .command("list")
+  .description("blueprint 一覧")
+  .addOption(repoNameOption())
+  .addOption(orgOption())
+  .addOption(jsonOption())
+  .action(async (opts: { repo?: string; org?: string; json?: boolean }) => {
+    process.exit(
+      await runSnapshotBlueprintsList({ repo: opts.repo, org: opts.org, json: opts.json === true }),
+    );
+  });
+
+blueprints
+  .command("get")
+  .description("blueprint 詳細")
+  .argument("<id>", "blueprint ID")
+  .addOption(orgOption())
+  .addOption(jsonOption())
+  .action(async (id: string, opts: { org?: string; json?: boolean }) => {
+    process.exit(await runSnapshotBlueprintGet({ id, org: opts.org, json: opts.json === true }));
+  });
+
+blueprints
+  .command("create")
+  .description("blueprint を作成 (build は自動では走らない)")
+  .addOption(repoNameOption())
+  .addOption(sourceOption())
+  .addOption(contentsOption())
+  .addOption(contentsFileOption())
+  .addOption(orgOption())
+  .addOption(jsonOption())
+  .action(
+    async (opts: {
+      repo?: string;
+      source?: string;
+      contents?: string;
+      contentsFile?: string;
+      org?: string;
+      json?: boolean;
+    }) => {
+      process.exit(
+        await runSnapshotBlueprintCreate({
+          repo: opts.repo,
+          source: opts.source,
+          contents: opts.contents,
+          contentsFile: opts.contentsFile,
+          org: opts.org,
+          json: opts.json === true,
+        }),
+      );
+    },
+  );
+
+blueprints
+  .command("update")
+  .description("blueprint を部分更新 (PATCH。build は自動では走らない)")
+  .argument("<id>", "blueprint ID")
+  .addOption(contentsOption())
+  .addOption(contentsFileOption())
+  .addOption(positionOption())
+  .addOption(sourceOption())
+  .addOption(boolValueOption("--build-on-default-branch <bool>", "push ごとの build を on/off"))
+  .addOption(boolValueOption("--report-check-runs <bool>", "commit build の check run を on/off"))
+  .addOption(orgOption())
+  .addOption(jsonOption())
+  .action(
+    async (
+      id: string,
+      opts: {
+        contents?: string;
+        contentsFile?: string;
+        position?: number;
+        source?: string;
+        buildOnDefaultBranch?: boolean;
+        reportCheckRuns?: boolean;
+        org?: string;
+        json?: boolean;
+      },
+    ) => {
+      process.exit(
+        await runSnapshotBlueprintUpdate({
+          id,
+          contents: opts.contents,
+          contentsFile: opts.contentsFile,
+          position: opts.position,
+          source: opts.source,
+          buildOnDefaultBranch: opts.buildOnDefaultBranch,
+          reportCheckRuns: opts.reportCheckRuns,
+          org: opts.org,
+          json: opts.json === true,
+        }),
+      );
+    },
+  );
+
+blueprints
+  .command("delete")
+  .description("blueprint を soft-delete")
+  .argument("<id>", "blueprint ID")
+  .addOption(orgOption())
+  .addOption(jsonOption())
+  .action(async (id: string, opts: { org?: string; json?: boolean }) => {
+    process.exit(await runSnapshotBlueprintDelete({ id, org: opts.org, json: opts.json === true }));
+  });
+
+blueprints
+  .command("contents")
+  .description("blueprint YAML の presigned URL を取得")
+  .argument("<id>", "blueprint ID")
+  .addOption(orgOption())
+  .addOption(jsonOption())
+  .action(async (id: string, opts: { org?: string; json?: boolean }) => {
+    process.exit(
+      await runSnapshotBlueprintContents({ id, org: opts.org, json: opts.json === true }),
+    );
+  });
+
+const blueprintFiles = blueprints
+  .command("files")
+  .description("blueprint file (env-var 置換素材) の一覧/アップロード/削除");
+
+blueprintFiles
+  .command("list")
+  .description("blueprint file 一覧")
+  .argument("<blueprint_id>", "blueprint ID")
+  .addOption(orgOption())
+  .addOption(jsonOption())
+  .action(async (blueprintId: string, opts: { org?: string; json?: boolean }) => {
+    process.exit(
+      await runSnapshotBlueprintFilesList({
+        blueprintId,
+        org: opts.org,
+        json: opts.json === true,
+      }),
+    );
+  });
+
+blueprintFiles
+  .command("upload")
+  .description("blueprint file をアップロード (multipart)")
+  .argument("<blueprint_id>", "blueprint ID")
+  .argument("<file_path>", "アップロードするファイルのパス")
+  .requiredOption("--name <name>", "file の名前")
+  .addOption(orgOption())
+  .addOption(jsonOption())
+  .action(
+    async (
+      blueprintId: string,
+      filePath: string,
+      opts: { name: string; org?: string; json?: boolean },
+    ) => {
+      process.exit(
+        await runSnapshotBlueprintFileUpload({
+          blueprintId,
+          filePath,
+          name: opts.name,
+          org: opts.org,
+          json: opts.json === true,
+        }),
+      );
+    },
+  );
+
+blueprintFiles
+  .command("delete")
+  .description("blueprint file を削除")
+  .argument("<blueprint_id>", "blueprint ID")
+  .argument("<file_id>", "file ID")
+  .addOption(orgOption())
+  .addOption(jsonOption())
+  .action(async (blueprintId: string, fileId: string, opts: { org?: string; json?: boolean }) => {
+    process.exit(
+      await runSnapshotBlueprintFileDelete({
+        blueprintId,
+        fileId,
+        org: opts.org,
+        json: opts.json === true,
+      }),
+    );
+  });
+
+const builds = snapshot
+  .command("builds")
+  .description("snapshot build の一覧/詳細/操作 (GET/POST /snapshot-setup/builds)");
+
+builds
+  .command("list")
+  .description("build 一覧")
+  .addOption(limitOption())
+  .addOption(new Option("--status <s>", "status で絞る").choices(BUILD_STATUSES))
+  .addOption(new Option("--active", "現在 session が使っている build のみ"))
+  .addOption(orgOption())
+  .addOption(jsonOption())
+  .action(
+    async (opts: {
+      limit?: number;
+      status?: string;
+      active?: boolean;
+      org?: string;
+      json?: boolean;
+    }) => {
+      process.exit(
+        await runSnapshotBuildsList({
+          limit: opts.limit,
+          status: opts.status,
+          active: opts.active,
+          org: opts.org,
+          json: opts.json === true,
+        }),
+      );
+    },
+  );
+
+builds
+  .command("get")
+  .description("build 詳細")
+  .argument("<id>", "build ID")
+  .addOption(orgOption())
+  .addOption(jsonOption())
+  .action(async (id: string, opts: { org?: string; json?: boolean }) => {
+    process.exit(await runSnapshotBuildGet({ id, org: opts.org, json: opts.json === true }));
+  });
+
+builds
+  .command("create")
+  .description("snapshot build を手動で起動 (計算リソースを消費する可能性あり。--yes 必須)")
+  .option("--yes", "実行を確認した")
+  .addOption(orgOption())
+  .addOption(jsonOption())
+  .action(async (opts: { yes?: boolean; org?: string; json?: boolean }) => {
+    process.exit(
+      await runSnapshotBuildCreate({
+        yes: opts.yes === true,
+        org: opts.org,
+        json: opts.json === true,
+      }),
+    );
+  });
+
+builds
+  .command("logs")
+  .description("build ログの presigned URL を取得")
+  .argument("<id>", "build ID")
+  .addOption(orgOption())
+  .addOption(jsonOption())
+  .action(async (id: string, opts: { org?: string; json?: boolean }) => {
+    process.exit(await runSnapshotBuildLogs({ id, org: opts.org, json: opts.json === true }));
+  });
+
+builds
+  .command("cancel")
+  .description("進行中の build をキャンセル")
+  .argument("<id>", "build ID")
+  .addOption(orgOption())
+  .addOption(jsonOption())
+  .action(async (id: string, opts: { org?: string; json?: boolean }) => {
+    process.exit(await runSnapshotBuildCancel({ id, org: opts.org, json: opts.json === true }));
+  });
+
+builds
+  .command("pin")
+  .description("成功した build を pin (7 日以内)")
+  .argument("<id>", "build ID")
+  .addOption(orgOption())
+  .addOption(jsonOption())
+  .action(async (id: string, opts: { org?: string; json?: boolean }) => {
+    process.exit(await runSnapshotBuildPin({ id, org: opts.org, json: opts.json === true }));
+  });
+
+builds
+  .command("unpin")
+  .description("build の pin を外す (その build に pin されている場合のみ)")
+  .argument("<id>", "build ID")
+  .addOption(orgOption())
+  .addOption(jsonOption())
+  .action(async (id: string, opts: { org?: string; json?: boolean }) => {
+    process.exit(await runSnapshotBuildUnpin({ id, org: opts.org, json: opts.json === true }));
+  });
 
 program
   .command("completion")

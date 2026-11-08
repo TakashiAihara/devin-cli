@@ -11,6 +11,13 @@ import {
   getOrganizationsOrgIdCodeScansProfilesProfileId as genCodeScanProfile,
   getOrganizationsOrgIdCodeScansScans as genCodeScanScans,
   getOrganizationsOrgIdConsumptionDaily as genConsumptionDaily,
+  getOrganizationsOrgIdSnapshotSetupBlueprints as genSnapshotBlueprints,
+  getOrganizationsOrgIdSnapshotSetupBlueprintsBlueprintId as genSnapshotBlueprint,
+  getOrganizationsOrgIdSnapshotSetupBlueprintsBlueprintIdContents as genSnapshotBlueprintContents,
+  getOrganizationsOrgIdSnapshotSetupBlueprintsBlueprintIdFiles as genSnapshotBlueprintFiles,
+  getOrganizationsOrgIdSnapshotSetupBuilds as genSnapshotBuilds,
+  getOrganizationsOrgIdSnapshotSetupBuildsBuildId as genSnapshotBuild,
+  getOrganizationsOrgIdSnapshotSetupBuildsBuildIdLogs as genSnapshotBuildLogs,
   getOrganizationsOrgIdConsumptionDailyServiceUsersServiceUserId as genConsumptionDailyServiceUser,
   getOrganizationsOrgIdConsumptionDailySessionsSessionId as genConsumptionDailySession,
   getOrganizationsOrgIdConsumptionDailyUsersUserId as genConsumptionDailyUser,
@@ -26,19 +33,34 @@ import {
   getOrganizationsOrgIdRepositoriesIndexing as genListIndexing,
   getOrganizationsOrgIdRepositoriesRepositoryPathIndexing as genGetIndexingRepo,
   getSelf as genSelf,
+  deleteOrganizationsOrgIdSnapshotSetupBlueprintsBlueprintId as genSnapshotBlueprintDelete,
+  deleteOrganizationsOrgIdSnapshotSetupBlueprintsBlueprintIdFilesFileId as genSnapshotBlueprintFileDelete,
+  deleteOrganizationsOrgIdSnapshotSetupBuildsBuildIdPin as genSnapshotBuildUnpin,
+  patchOrganizationsOrgIdSnapshotSetupBlueprintsBlueprintId as genSnapshotBlueprintUpdate,
+  postOrganizationsOrgIdSnapshotSetupBlueprints as genSnapshotBlueprintCreate,
+  postOrganizationsOrgIdSnapshotSetupBlueprintsBlueprintIdFiles as genSnapshotBlueprintFileUpload,
+  postOrganizationsOrgIdSnapshotSetupBuilds as genSnapshotBuildTrigger,
+  postOrganizationsOrgIdSnapshotSetupBuildsBuildIdCancel as genSnapshotBuildCancel,
+  postOrganizationsOrgIdSnapshotSetupBuildsBuildIdPin as genSnapshotBuildPin,
   putOrganizationsOrgIdRepositoriesIndexing as genPutIndexingBulk,
   putOrganizationsOrgIdRepositoriesRepositoryPathIndexing as genPutIndexingRepo,
 } from "../generated/index.ts";
 import type {
   BulkIndexRepositoriesRequest,
+  CreateOrgBlueprintBody,
   GetOrganizationsOrgIdCodeScansFindingsParams,
   GetOrganizationsOrgIdCodeScansMetricsParams,
   GetOrganizationsOrgIdCodeScansProfilesParams,
   GetOrganizationsOrgIdCodeScansScansParams,
   GetOrganizationsOrgIdRepositoriesIndexingParams,
   GetOrganizationsOrgIdRepositoriesParams,
+  GetOrganizationsOrgIdSnapshotSetupBlueprintsParams,
+  GetOrganizationsOrgIdSnapshotSetupBuildsParams,
   IndexRepositoryRequest,
+  PinBuildBody,
   RemoveRepositoriesRequest,
+  TriggerBuildBody,
+  UpdateOrgBlueprintBody,
 } from "../generated/api.schemas.ts";
 
 export type SelfResponse = Awaited<ReturnType<typeof genSelf>>;
@@ -58,6 +80,13 @@ export type CodeScanMetrics = Awaited<ReturnType<typeof genCodeScanMetrics>>;
 export type CodeScanPage = Awaited<ReturnType<typeof genCodeScanScans>>;
 export type CodeScanProfilePage = Awaited<ReturnType<typeof genCodeScanProfiles>>;
 export type CodeScanProfileDetail = Awaited<ReturnType<typeof genCodeScanProfile>>;
+export type SnapshotBlueprintList = Awaited<ReturnType<typeof genSnapshotBlueprints>>;
+export type SnapshotBlueprint = Awaited<ReturnType<typeof genSnapshotBlueprint>>;
+export type SnapshotPresignedDownload = Awaited<ReturnType<typeof genSnapshotBlueprintContents>>;
+export type SnapshotBlueprintFileList = Awaited<ReturnType<typeof genSnapshotBlueprintFiles>>;
+export type SnapshotBlueprintFile = Awaited<ReturnType<typeof genSnapshotBlueprintFileUpload>>;
+export type SnapshotBuildPage = Awaited<ReturnType<typeof genSnapshotBuilds>>;
+export type SnapshotBuild = Awaited<ReturnType<typeof genSnapshotBuild>>;
 
 const w = (win: Window) => ({ time_after: win.time_after, time_before: win.time_before });
 // 生成コードは path param を素で埋め込むので、こちらで encode して `..` や `?` による
@@ -180,3 +209,67 @@ export const codeScanProfiles = (
 
 export const codeScanProfile = (orgId: string, profileId: string) =>
   genCodeScanProfile(enc(orgId), enc(profileId));
+
+// --- snapshot-setup (org scope) ---
+// BlueprintList / BlueprintFileList / PaginatedResponse_Build_ は items ではなく data/items の
+// envelope なので、commands 側で形を確認してから使う
+
+export const snapshotBlueprints = (
+  orgId: string,
+  params?: GetOrganizationsOrgIdSnapshotSetupBlueprintsParams,
+) => genSnapshotBlueprints(enc(orgId), params);
+
+export const snapshotBlueprintCreate = (orgId: string, body: CreateOrgBlueprintBody) =>
+  genSnapshotBlueprintCreate(enc(orgId), body);
+
+export const snapshotBlueprint = (orgId: string, blueprintId: string) =>
+  genSnapshotBlueprint(enc(orgId), enc(blueprintId));
+
+export const snapshotBlueprintUpdate = (
+  orgId: string,
+  blueprintId: string,
+  body: UpdateOrgBlueprintBody,
+) => genSnapshotBlueprintUpdate(enc(orgId), enc(blueprintId), body);
+
+export const snapshotBlueprintDelete = (orgId: string, blueprintId: string) =>
+  genSnapshotBlueprintDelete(enc(orgId), enc(blueprintId));
+
+export const snapshotBlueprintContents = (orgId: string, blueprintId: string) =>
+  genSnapshotBlueprintContents(enc(orgId), enc(blueprintId));
+
+export const snapshotBlueprintFiles = (orgId: string, blueprintId: string) =>
+  genSnapshotBlueprintFiles(enc(orgId), enc(blueprintId));
+
+// files の POST は multipart/form-data。name は query param (必須)
+export const snapshotBlueprintFileUpload = (
+  orgId: string,
+  blueprintId: string,
+  file: Blob,
+  name: string,
+) => genSnapshotBlueprintFileUpload(enc(orgId), enc(blueprintId), { file }, { name });
+
+export const snapshotBlueprintFileDelete = (orgId: string, blueprintId: string, fileId: string) =>
+  genSnapshotBlueprintFileDelete(enc(orgId), enc(blueprintId), enc(fileId));
+
+export const snapshotBuilds = (
+  orgId: string,
+  params?: GetOrganizationsOrgIdSnapshotSetupBuildsParams,
+) => genSnapshotBuilds(enc(orgId), params);
+
+export const snapshotBuildTrigger = (orgId: string, body: TriggerBuildBody) =>
+  genSnapshotBuildTrigger(enc(orgId), body);
+
+export const snapshotBuild = (orgId: string, buildId: string) =>
+  genSnapshotBuild(enc(orgId), enc(buildId));
+
+export const snapshotBuildLogs = (orgId: string, buildId: string) =>
+  genSnapshotBuildLogs(enc(orgId), enc(buildId));
+
+export const snapshotBuildCancel = (orgId: string, buildId: string) =>
+  genSnapshotBuildCancel(enc(orgId), enc(buildId));
+
+export const snapshotBuildPin = (orgId: string, buildId: string, body: PinBuildBody) =>
+  genSnapshotBuildPin(enc(orgId), enc(buildId), body);
+
+export const snapshotBuildUnpin = (orgId: string, buildId: string) =>
+  genSnapshotBuildUnpin(enc(orgId), enc(buildId));
