@@ -7,10 +7,79 @@ export type Shell = (typeof SHELLS)[number];
 export type CompletionOptions = { shell: Shell };
 
 // 補完に出す語の一覧。cli.ts のコマンド定義と対応させる
-const TOP_COMMANDS = ["self", "billing", "consumption", "metrics", "completion"];
+const TOP_COMMANDS = [
+  "self",
+  "billing",
+  "consumption",
+  "metrics",
+  "notes",
+  "automations",
+  "schedules",
+  "completion",
+];
 const CONSUMPTION_SUBCOMMANDS = ["daily", "user", "service-user", "session"];
+const NOTES_SUBCOMMANDS = ["folders", "list", "get", "create", "update", "delete"];
+const AUTOMATIONS_SUBCOMMANDS = [
+  "list",
+  "get",
+  "create",
+  "update",
+  "delete",
+  "schemas",
+  "templates",
+];
+const SCHEDULES_SUBCOMMANDS = ["list", "get", "create", "update", "delete"];
 
-// bash: complete -F + compgen。値を取るオプション (--days / --org) の直後では補完しない
+// 値を取るオプション。直後の語では補完しない
+const VALUE_OPTIONS = [
+  "--days",
+  "--org",
+  "--limit",
+  "--folder",
+  "--search",
+  "--pinned-repo",
+  "--title",
+  "--body",
+  "--body-file",
+  "--trigger",
+  "--folder-id",
+  "--creator",
+  "--event-type",
+  "--agent-type",
+  "--name",
+  "--run-as",
+  "--prompt",
+  "--template-id",
+  "--metadata",
+  "--body-json",
+  "--security-profile-id",
+  "--schedule-type",
+  "--frequency",
+  "--interval-count",
+  "--scheduled-at",
+  "--agent",
+  "--notify-on",
+  "--platform",
+  "--playbook-id",
+  "--skill-plugin",
+  "--skill-name",
+  "--tags",
+  "--slack-channel-id",
+  "--slack-team-id",
+  "--target-devin-id",
+  "--create-as-user-id",
+  "--run-as-user-id",
+];
+
+// グループごとのオプション集合 (サブコマンド名より後でのみ有効)
+const NOTES_OPTIONS =
+  "--org --json --limit --folder --search --pinned-repo --title --body --body-file --trigger --folder-id --clear-folder --clear-pinned-repo --enabled --disabled";
+const AUTOMATIONS_OPTIONS =
+  "--org --json --limit --search --creator --event-type --agent-type --enabled --disabled --name --run-as --trigger --prompt --template-id --metadata --body-json --body-file --security-profile-id";
+const SCHEDULES_OPTIONS =
+  "--org --json --limit --name --prompt --schedule-type --frequency --interval-count --scheduled-at --agent --notify-on --platform --playbook-id --skill-plugin --skill-name --tags --slack-channel-id --slack-team-id --target-devin-id --bypass-approval --body-json --body-file --create-as-user-id --run-as-user-id --enabled --disabled";
+
+// bash: complete -F + compgen。値を取るオプションの直後では補完しない
 const bashScript = `# devin-cli bash completion
 # 生成: devin-cli completion bash
 # 例: devin-cli completion bash > ~/.devin-cli-completion.bash
@@ -26,9 +95,9 @@ _devin_cli() {
     cmd="\${COMP_WORDS[1]}"
   fi
 
-  # --days / --org は値を取るので、値の位置では補完しない
+  # 値を取るオプションの直後では補完しない
   case "$prev" in
-    --days|--org) return 0 ;;
+    ${VALUE_OPTIONS.join("|")}) return 0 ;;
   esac
 
   if [[ "$cur" == -* ]]; then
@@ -43,6 +112,21 @@ _devin_cli() {
           # consumption / metrics は第 2 引数 (サブコマンド・metrics 名) の後でのみ有効
           if [ "$COMP_CWORD" -ge 3 ]; then
             opts="$opts --days --org --json"
+          fi
+          ;;
+        notes)
+          if [ "$COMP_CWORD" -ge 3 ]; then
+            opts="$opts ${NOTES_OPTIONS}"
+          fi
+          ;;
+        automations)
+          if [ "$COMP_CWORD" -ge 3 ]; then
+            opts="$opts ${AUTOMATIONS_OPTIONS}"
+          fi
+          ;;
+        schedules)
+          if [ "$COMP_CWORD" -ge 3 ]; then
+            opts="$opts ${SCHEDULES_OPTIONS}"
           fi
           ;;
       esac
@@ -65,6 +149,21 @@ _devin_cli() {
     metrics)
       if [ "$COMP_CWORD" -eq 2 ]; then
         COMPREPLY=($(compgen -W "${METRICS.join(" ")}" -- "$cur"))
+      fi
+      ;;
+    notes)
+      if [ "$COMP_CWORD" -eq 2 ]; then
+        COMPREPLY=($(compgen -W "${NOTES_SUBCOMMANDS.join(" ")}" -- "$cur"))
+      fi
+      ;;
+    automations)
+      if [ "$COMP_CWORD" -eq 2 ]; then
+        COMPREPLY=($(compgen -W "${AUTOMATIONS_SUBCOMMANDS.join(" ")}" -- "$cur"))
+      fi
+      ;;
+    schedules)
+      if [ "$COMP_CWORD" -eq 2 ]; then
+        COMPREPLY=($(compgen -W "${SCHEDULES_SUBCOMMANDS.join(" ")}" -- "$cur"))
       fi
       ;;
     completion)
@@ -100,6 +199,15 @@ _devin_cli() {
           # consumption / metrics は第 2 引数の後でのみ有効
           (( CURRENT >= 4 )) && candidates+=(--days --org --json)
           ;;
+        notes)
+          (( CURRENT >= 4 )) && candidates+=(${NOTES_OPTIONS})
+          ;;
+        automations)
+          (( CURRENT >= 4 )) && candidates+=(${AUTOMATIONS_OPTIONS})
+          ;;
+        schedules)
+          (( CURRENT >= 4 )) && candidates+=(${SCHEDULES_OPTIONS})
+          ;;
       esac
     fi
   elif (( CURRENT == 2 )); then
@@ -108,6 +216,9 @@ _devin_cli() {
     case "$cmd" in
       consumption) candidates=(${CONSUMPTION_SUBCOMMANDS.join(" ")}) ;;
       metrics) candidates=(${METRICS.join(" ")}) ;;
+      notes) candidates=(${NOTES_SUBCOMMANDS.join(" ")}) ;;
+      automations) candidates=(${AUTOMATIONS_SUBCOMMANDS.join(" ")}) ;;
+      schedules) candidates=(${SCHEDULES_SUBCOMMANDS.join(" ")}) ;;
       completion) candidates=(${SHELLS.join(" ")}) ;;
     esac
   fi
@@ -120,6 +231,83 @@ _devin_cli() {
 _devin_cli "$@"`;
 
 // fish: complete ビルトイン。-n の条件で出す位置を絞る
+const fishGroup = (name: string, subs: readonly string[]) =>
+  [
+    `# ${name} のサブコマンド`,
+    `complete -c devin-cli -f -n '__fish_seen_subcommand_from ${name}; and not __fish_seen_subcommand_from ${subs.join(" ")}' -a '${subs.join(" ")}'`,
+    // 値を取るオプションと boolean を分けて出す
+    ...groupValueOptions(name).map(
+      (o) => `complete -c devin-cli -l ${o.slice(2)} -x -n '__fish_seen_subcommand_from ${name}'`,
+    ),
+    ...groupBoolOptions(name).map(
+      (o) => `complete -c devin-cli -l ${o.slice(2)} -n '__fish_seen_subcommand_from ${name}'`,
+    ),
+  ].join("\n");
+
+// 各グループで値を取るオプション / boolean オプション
+const GROUP_VALUE_OPTIONS: Record<string, string[]> = {
+  notes: [
+    "--org",
+    "--limit",
+    "--folder",
+    "--search",
+    "--pinned-repo",
+    "--title",
+    "--body",
+    "--body-file",
+    "--trigger",
+    "--folder-id",
+  ],
+  automations: [
+    "--org",
+    "--limit",
+    "--search",
+    "--creator",
+    "--event-type",
+    "--agent-type",
+    "--name",
+    "--run-as",
+    "--trigger",
+    "--prompt",
+    "--template-id",
+    "--metadata",
+    "--body-json",
+    "--body-file",
+    "--security-profile-id",
+  ],
+  schedules: [
+    "--org",
+    "--limit",
+    "--name",
+    "--prompt",
+    "--schedule-type",
+    "--frequency",
+    "--interval-count",
+    "--scheduled-at",
+    "--agent",
+    "--notify-on",
+    "--platform",
+    "--playbook-id",
+    "--skill-plugin",
+    "--skill-name",
+    "--tags",
+    "--slack-channel-id",
+    "--slack-team-id",
+    "--target-devin-id",
+    "--body-json",
+    "--body-file",
+    "--create-as-user-id",
+    "--run-as-user-id",
+  ],
+};
+const GROUP_BOOL_OPTIONS: Record<string, string[]> = {
+  notes: ["--enabled", "--disabled", "--clear-folder", "--clear-pinned-repo"],
+  automations: ["--enabled", "--disabled"],
+  schedules: ["--enabled", "--disabled", "--bypass-approval"],
+};
+const groupValueOptions = (name: string): string[] => GROUP_VALUE_OPTIONS[name] ?? [];
+const groupBoolOptions = (name: string): string[] => GROUP_BOOL_OPTIONS[name] ?? [];
+
 const fishScript = `# devin-cli fish completion
 # 生成: devin-cli completion fish
 # 例: この出力を ~/.config/fish/completions/devin-cli.fish に保存する
@@ -129,6 +317,9 @@ complete -c devin-cli -f -n '__fish_use_subcommand' -a 'self' -d 'GET /v3/self�
 complete -c devin-cli -f -n '__fish_use_subcommand' -a 'billing' -d '直近 N 日の ACU 消費サマリ (合計・製品別・日別)'
 complete -c devin-cli -f -n '__fish_use_subcommand' -a 'consumption' -d '日次 ACU 消費 (組織・ユーザー・service user・session)'
 complete -c devin-cli -f -n '__fish_use_subcommand' -a 'metrics' -d '組織の利用 metrics'
+complete -c devin-cli -f -n '__fish_use_subcommand' -a 'notes' -d 'knowledge notes (org scope)'
+complete -c devin-cli -f -n '__fish_use_subcommand' -a 'automations' -d 'automations (org scope)'
+complete -c devin-cli -f -n '__fish_use_subcommand' -a 'schedules' -d 'schedules (org scope、deprecated)'
 complete -c devin-cli -f -n '__fish_use_subcommand' -a 'completion' -d 'シェル補完スクリプトを stdout に出す'
 
 # consumption のサブコマンド (consumption の直後でのみ)
@@ -137,13 +328,19 @@ complete -c devin-cli -f -n '__fish_seen_subcommand_from consumption; and not __
 # metrics 名 (metrics の直後でのみ)
 complete -c devin-cli -f -n '__fish_seen_subcommand_from metrics; and not __fish_seen_subcommand_from ${METRICS.join(" ")}' -a '${METRICS.join(" ")}'
 
+${fishGroup("notes", NOTES_SUBCOMMANDS)}
+
+${fishGroup("automations", AUTOMATIONS_SUBCOMMANDS)}
+
+${fishGroup("schedules", SCHEDULES_SUBCOMMANDS)}
+
 # completion のシェル名
 complete -c devin-cli -f -n '__fish_seen_subcommand_from completion' -a '${SHELLS.join(" ")}'
 
 # オプション。self は --json のみ、billing / consumption の各サブコマンド / metrics は --days --org --json
 complete -c devin-cli -s h -l help -d 'display help for command'
 complete -c devin-cli -s V -l version -d 'output the version number' -n 'not __fish_seen_subcommand_from ${TOP_COMMANDS.join(" ")}'
-complete -c devin-cli -l json -d 'TSV ではなく JSON を stdout に出す' -n '__fish_seen_subcommand_from self billing metrics; or __fish_seen_subcommand_from ${CONSUMPTION_SUBCOMMANDS.join(" ")}'
+complete -c devin-cli -l json -d 'TSV ではなく JSON を stdout に出す' -n '__fish_seen_subcommand_from self billing metrics notes automations schedules; or __fish_seen_subcommand_from ${CONSUMPTION_SUBCOMMANDS.join(" ")}'
 complete -c devin-cli -l days -x -d '直近 N 暦日' -n '__fish_seen_subcommand_from billing metrics; or __fish_seen_subcommand_from ${CONSUMPTION_SUBCOMMANDS.join(" ")}'
 complete -c devin-cli -l org -x -d 'org ID (省略時は自動解決)' -n '__fish_seen_subcommand_from billing metrics; or __fish_seen_subcommand_from ${CONSUMPTION_SUBCOMMANDS.join(" ")}'`;
 
