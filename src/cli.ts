@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
 import { Argument, Command, InvalidArgumentError, Option } from "commander";
 import { runBilling } from "./commands/billing.ts";
+import { runCompletion, SHELLS, type Shell } from "./commands/completion.ts";
 import {
   runConsumptionDaily,
   runConsumptionServiceUser,
@@ -157,6 +158,14 @@ program
     process.exit(
       await runMetrics({ name, days: opts.days, org: opts.org, json: opts.json === true }),
     );
+  });
+
+program
+  .command("completion")
+  .description("シェル補完スクリプトを stdout に出す")
+  .addArgument(new Argument("<shell>", "bash / zsh / fish").choices(SHELLS))
+  .action(async (shell: Shell) => {
+    process.exit(await runCompletion({ shell }));
   });
 
 // 1 は相手が否と答えた、2 は使い方・秘密・通信の誤り、70 は想定外の内部エラー
