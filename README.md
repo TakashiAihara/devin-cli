@@ -84,7 +84,9 @@ api_key_command = "op read op://Private/devin-api-key/credential"  # 1Password C
 - consumption 系: `ViewOrgConsumption`
 - metrics 系: `ViewOrgMetrics`
 
-PAT / service user に権限を付けて発行する。Pro plan (self-serve) では org scope の consumption / metrics ともに動作確認済み。enterprise scope (`/v3/enterprise/*`) は 403 になる。`--days` の上限は 100（consumption / metrics とも。CLI 側でも検査する）。
+PAT / service user に権限を付けて発行する。Pro plan (self-serve) では org scope の consumption / metrics ともに動作確認済み。`--days` の上限は 100（consumption / metrics とも。CLI 側でも検査する）。
+
+**enterprise scope (`/v3/enterprise/*`, `/v3beta1/enterprise/*`) は対象外**。これらのエンドポイントは Enterprise plan 専用で、Pro/self-serve では全て 403 を返す（実測済み）。そのため org 管理・members/service-users 管理・git-providers・audit-logs 等の enterprise 系コマンドは実装していない。Enterprise plan を使う場合は別途対応が必要（issue #32 参照）。
 
 ## 日付の扱い
 
