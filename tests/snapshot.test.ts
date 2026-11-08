@@ -79,7 +79,7 @@ describe("snapshot blueprints", () => {
     ]);
     expect(r.code).toBe(0);
     const call = ctx.fake.log.find((l) => l.method === "POST" && l.path === BLUEPRINTS);
-    expect(JSON.parse(call?.body ?? "{}")).toEqual({
+    expect(call?.body).toEqual({
       contents: "initialize: bun install",
       repo_name: "acme/one",
       source: "database",
@@ -99,7 +99,7 @@ describe("snapshot blueprints", () => {
     ]);
     expect(r.code).toBe(0);
     const call = ctx.fake.log.find((l) => l.method === "POST" && l.path === BLUEPRINTS);
-    expect(JSON.parse(call?.body ?? "{}")).toEqual({
+    expect(call?.body).toEqual({
       contents: "initialize: echo hi\n",
     });
   });
@@ -141,7 +141,7 @@ describe("snapshot blueprints", () => {
     const call = ctx.fake.log.find(
       (l) => l.method === "PATCH" && l.path === `${BLUEPRINTS}/bp-org-1`,
     );
-    expect(JSON.parse(call?.body ?? "{}")).toEqual({
+    expect(call?.body).toEqual({
       contents: "new yaml",
       position: 2,
       build_on_default_branch_commit: true,
@@ -218,8 +218,9 @@ describe("snapshot blueprints files", () => {
     const call = ctx.fake.log.find((l) => l.method === "POST" && l.path === FILES);
     expect(call).toBeDefined();
     expect(call?.query.get("name")).toBe("npm-token.txt");
-    expect(call?.body).toContain('name="file"; filename="token.txt"');
-    expect(call?.body).toContain("secret-token-value");
+    // multipart body は JSON でないので fake は生テキストとして記録する
+    expect(call?.body as string).toContain('name="file"; filename="token.txt"');
+    expect(call?.body as string).toContain("secret-token-value");
     expect(r.out).toContain("bf-1\tnpm-token.txt");
   });
 

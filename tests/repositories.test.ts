@@ -107,7 +107,7 @@ describe("repositories indexing", () => {
       (l) => l.method === "PUT" && l.path === "/v3/organizations/org-x/repositories/indexing",
     );
     expect(call).toBeDefined();
-    expect(JSON.parse(call?.body ?? "{}")).toEqual({
+    expect(call?.body).toEqual({
       repositories: [
         { repository_path: "acme/one", branch_names: ["main", "dev"] },
         { repository_path: "acme/two", branch_names: ["main", "dev"] },
@@ -120,7 +120,7 @@ describe("repositories indexing", () => {
     const r = await ctx.run(["repositories", "indexing", "set", "acme/one", "--org", "org-x"]);
     expect(r.code).toBe(0);
     const call = ctx.fake.log.find((l) => l.method === "PUT");
-    expect(JSON.parse(call?.body ?? "{}")).toEqual({
+    expect(call?.body).toEqual({
       repositories: [{ repository_path: "acme/one" }],
     });
   });
@@ -139,7 +139,7 @@ describe("repositories indexing", () => {
     const call = ctx.fake.log.find(
       (l) => l.method === "DELETE" && l.path === "/v3/organizations/org-x/repositories/indexing",
     );
-    expect(JSON.parse(call?.body ?? "{}")).toEqual({
+    expect(call?.body).toEqual({
       repository_paths: ["acme/one", "acme/two"],
     });
   });
@@ -194,7 +194,7 @@ describe("repositories indexing-repo", () => {
     const call = ctx.fake.log.find(
       (l) => l.method === "PUT" && l.path.includes("/repositories/acme%2Fone/indexing"),
     );
-    expect(JSON.parse(call?.body ?? "{}")).toEqual({ branch_names: ["release"] });
+    expect(call?.body).toEqual({ branch_names: ["release"] });
     expect(r.out).toContain("acme/one\ttrue\tmain");
   });
 

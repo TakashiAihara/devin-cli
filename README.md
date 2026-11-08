@@ -23,6 +23,11 @@ bun run start -- self
 bun run start -- billing --days 30
 bun run start -- consumption daily --days 7
 bun run start -- metrics usage --days 30
+bun run start -- sessions list --limit 20
+bun run start -- notes list
+bun run start -- notes create --title "Deploy 手順" --body-file deploy.md --trigger "deploy を頼まれたとき"
+bun run start -- automations list
+bun run start -- automations schemas
 bun run start -- repositories list
 bun run start -- code-scans findings
 bun run start -- code-scans metrics --days 30
@@ -50,6 +55,33 @@ echo 'source ~/.devin-cli-completion.bash' >> ~/.bashrc
 | `consumption service-user <id> [--days N]` | service user の日次消費 |
 | `consumption session <id> [--days N]` | session の日次消費 |
 | `metrics <name> [--days N]` | `usage` / `sessions` / `prs` / `searches` / `dau` / `wau` / `mau` / `active-users` |
+| `sessions list [--limit N]` | セッション一覧（cursor ページネーション。`--status`/`--tag`/`--origin`/`--archived` 等で絞れる） |
+| `sessions get <id>` | セッション詳細 |
+| `sessions messages <id> [--limit N]` | セッションのメッセージ一覧 |
+| `sessions insights [id]` | insights。ID 省略時は組織全体の一覧 |
+| `sessions attachments <id>` | セッションの添付一覧 |
+| `sessions create --prompt <text>` | セッション作成（**実費が発生する**。`--prompt -` で stdin から読む） |
+| `sessions archive <id>` | セッションを archive |
+| `sessions tags get/add/set <id> [tags...]` | タグの一覧・追加・全置換 |
+| `sessions delete <id> --yes` | セッション終了（破壊的。`--yes` 必須、無いと dry-run で exit 2） |
+| `notes folders` | knowledge フォルダ一覧と note 数（`GET /knowledge/folders`） |
+| `notes list [--folder <path>] [--search <q>] [--pinned-repo <repo>] [--limit N]` | knowledge notes 一覧（カーソルで全ページ取得） |
+| `notes get <note_id>` | note 詳細（body を含む） |
+| `notes create --title <t> --body <text>\|--body-file <path> --trigger <t> [--folder-id <id>] [--pinned-repo <repo>] [--enabled\|--disabled]` | note 作成 |
+| `notes update <note_id> [同上のフィールド] [--clear-folder] [--clear-pinned-repo]` | note 更新（現在値に指定分をマージして PUT） |
+| `notes delete <note_id>` | note 削除 |
+| `automations list [--search] [--creator] [--event-type] [--agent-type]... [--enabled\|--disabled] [--limit N]` | automations 一覧（カーソルで全ページ取得） |
+| `automations get <id>` | automation 詳細 |
+| `automations create --name <n> --run-as <organization\|creator\|service-user:<id>> --trigger <event_type>... --prompt <text> [--metadata k=v]...` | automation 作成。`--body-json` / `--body-file` で `AutomationCreateRequest` 全体も渡せる |
+| `automations update <id> [--name] [--enabled\|--disabled] [--body-json\|--body-file]` | automation 更新（PATCH の差分） |
+| `automations delete <id>` | automation 削除（soft delete） |
+| `automations schemas [--security-profile-id <id>]` | トリガーのイベントスキーマ一覧（構造が大きいので TSV はサマリ + イベント一覧。`--json` 推奨） |
+| `automations templates` | 組み込みテンプレート一覧 |
+| `schedules list [--limit N]` | schedules 一覧（**deprecated**。offset ページング） |
+| `schedules get <id>` | schedule 詳細 |
+| `schedules create --name <n> --prompt <text> [--schedule-type recurring\|one_time] [--frequency <cron>] [--scheduled-at <datetime>] ...` | schedule 作成 |
+| `schedules update <id> [フィールド] [--enabled\|--disabled]` | schedule 更新（PATCH の差分） |
+| `schedules delete <id>` | schedule 削除（soft delete） |
 | `repositories list [--limit N] [--filter <name>]` | 組織が使えるリポジトリ一覧（cursor pagination は `--limit` まで自動で辿る） |
 | `repositories indexing list\|set\|delete` | indexing の一括設定。`set`/`delete` は `<paths...>` を取り、`set` は `--branch`（繰り返し可）でブランチ指定 |
 | `repositories indexing-repo <path> get\|set\|delete` | リポジトリ別の indexing 設定（`<path>` は `org/repo` 形式。API には `org%2Frepo` として送られる） |
@@ -72,6 +104,17 @@ echo 'source ~/.devin-cli-completion.bash' >> ~/.bashrc
 `--org <id>` で org を明示できる。省略時は `--org` > `DEVIN_ORG_ID` > config `org_id` > `GET /v3/self` の順で解決する。
 
 出力は既定で TSV。`--json` で生 JSON。
+
+### knowledge notes / automations / schedules
+
+- すべて org scope（`/v3/organizations/{org}/...`）。`--limit N` を付けると取得件数を打ち切れる（省略時は全ページ取得）
+- `notes list` / `automations list` はカーソルページング（`first`/`after`）、`schedules list` は旧式の offset ページング（`limit`/`offset`）
+- `notes update` は PUT（全項目置き換え）のため、現在値を GET してから指定分だけ差し替えて送る。`--clear-folder` / `--clear-pinned-repo` で null に戻せる
+- `automations create` は `--name --run-as --trigger(繰返) --prompt` のフラグ指定か、`--body-json` / `--body-file` で `AutomationCreateRequest` 全体を渡す。トリガーのイベント種別や条件の詳細は `automations schemas --json` / `automations templates` で確認する
+- `automations update` / `schedules update` は PATCH の差分。`--body-json` / `--body-file` で任意フィールドを渡せる（フラグと浅くマージ、フラグ優先）
+- `--body-file -` で stdin から JSON / 本文を読める
+- **schedules は deprecated**。API 側で Automations（`schedule:recurring` トリガー）に置き換えられており、新規の定期実行は `automations create` を使う。既存 schedule の参照・更新・削除のために残している
+- schedule のパス ID はレスポンスの `scheduled_session_id`（`sched-...`）を使う。`ScheduleResponse` に `schedule_id` フィールドは無い（spec の欠落）
 
 ## 環境変数
 
@@ -105,9 +148,15 @@ api_key_command = "op read op://Private/devin-api-key/credential"  # 1Password C
 
 - consumption 系: `ViewOrgConsumption`
 - metrics 系: `ViewOrgMetrics`
+- sessions 系: セッションの read / write 権限（一覧・詳細・messages・insights・attachments の read と、create / archive / tags / delete の write）
+- notes 系: 読み取りは org 参加で可。作成・更新・削除は knowledge 管理権限が必要
+- automations 系: 一覧・`schemas`・`templates` は `ViewOrgAutomations`、作成・更新・削除は `ManageOrgAutomations`
+- schedules 系: `ManageOrgSchedules`（deprecated）
 - repositories / code-scans / snapshot 系: org scope の各エンドポイント。必要な権限はリソースごとに異なる（リポジトリ管理・code scan 閲覧・snapshot 構成など。Devin docs の permissions 一覧を参照）
 
-PAT / service user に権限を付けて発行する。Pro plan (self-serve) では org scope の consumption / metrics ともに動作確認済み。`--days` の上限は 100（consumption / metrics とも。CLI 側でも検査する）。
+PAT / service user に権限を付けて発行する。Pro plan (self-serve) では org scope の consumption / metrics / sessions / notes / automations / schedules の読み取り系を実測済み。`--days` の上限は 100（consumption / metrics とも。CLI 側でも検査する）。
+
+**`sessions create` は実費（ACU）が発生する操作**。`--max-acu` で上限を付けられる。**`sessions delete` はセッションを終了する破壊的操作**で、`--yes` を付けない限り dry-run（対象の表示のみ）で exit 2 になる。
 
 **注意**: `repositories indexing set/delete`、`snapshot blueprints create/update/delete`、`snapshot blueprints files upload/delete`、`snapshot builds create/cancel/pin/unpin` は書き込み系。`snapshot builds create` は計算リソースを消費し得るため `--yes` を必須にしている。これらの mutation 系は自動テストでは fake server のみで検証しており、実 API に対する動作確認は GET 系に限ること。
 

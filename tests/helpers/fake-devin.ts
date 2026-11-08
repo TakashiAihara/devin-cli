@@ -74,6 +74,264 @@ export const METRICS_ACTIVE_USERS = [
   { start_time: 1767312000, end_time: 1767398399, active_users: 3 }, // 2026-01-02T00:00Z..23:59:59Z
 ];
 
+// ---- knowledge notes ----
+
+export const KNOWLEDGE_FOLDERS = {
+  folders: [
+    { folder_id: "fld-1", name: "Docs", path: "docs", note_count: 2, parent_folder_id: null },
+    {
+      folder_id: "fld-2",
+      name: "Runbooks",
+      path: "docs/runbooks",
+      note_count: 1,
+      parent_folder_id: "fld-1",
+    },
+    {
+      folder_id: "fld-3",
+      name: "Snippets",
+      path: "snippets",
+      note_count: 0,
+      parent_folder_id: null,
+    },
+  ],
+  root_note_count: 3,
+};
+
+const NOTE_BASE = {
+  access_type: "org",
+  folder_id: "fld-1",
+  folder_path: "docs",
+  is_enabled: true,
+  macro: null,
+  org_id: "org-x",
+  pinned_repo: null,
+};
+
+export const KNOWLEDGE_NOTE = {
+  ...NOTE_BASE,
+  note_id: "note-1",
+  name: "Auth notes",
+  body: "# Auth\n\nUse SSO.",
+  trigger: "when asked about auth",
+  created_at: 1767225600, // 2026-01-01T00:00:00Z
+  updated_at: 1767312000, // 2026-01-02T00:00:00Z
+};
+
+// 3 件にしてページング (fake は 1 ページ最大 2 件) を必ず通す
+export const KNOWLEDGE_NOTES = [
+  KNOWLEDGE_NOTE,
+  {
+    ...NOTE_BASE,
+    note_id: "note-2",
+    name: "Billing FAQ",
+    body: "billing body",
+    trigger: "billing",
+    folder_id: null,
+    folder_path: "",
+    created_at: 1767225600,
+    updated_at: 1767225600,
+  },
+  {
+    ...NOTE_BASE,
+    note_id: "note-3",
+    name: "Deploy steps",
+    body: "deploy body",
+    trigger: "deploy",
+    folder_id: "fld-2",
+    folder_path: "docs/runbooks",
+    pinned_repo: "org/repo",
+    macro: "!deploy",
+    created_at: 1767225600,
+    updated_at: 1767225600,
+  },
+];
+
+// ---- automations ----
+
+export const AUTOMATION = {
+  automation_id: "auto-1",
+  name: "Nightly triage",
+  enabled: true,
+  run_as: { type: "organization" },
+  template_id: null,
+  created_at: 1767225600,
+  updated_at: 1767312000,
+  next_run_at: 1767400000,
+  created_by: { type: "user", id: "user-1", name: "Test User" },
+  last_edited_by: null,
+  last_invocation: { fired_at: 1767312000, status: "succeeded" },
+  metadata: { team: "infra" },
+  triggers: [
+    { event_type: "schedule:recurring", trigger_id: "trig-1", conditions: null, replies: [] },
+  ],
+  actions: [{ type: "start_session", prompt: "do the thing" }],
+};
+
+export const AUTOMATIONS = [
+  AUTOMATION,
+  {
+    ...AUTOMATION,
+    automation_id: "auto-2",
+    name: "PR review",
+    enabled: false,
+    run_as: { type: "service_user", service_user_id: "svc-1" },
+    template_id: "tpl-1",
+    next_run_at: null,
+    last_invocation: null,
+    metadata: {},
+    triggers: [{ event_type: "github:pull_request", trigger_id: "trig-2" }],
+    actions: [{ type: "start_session", prompt: "review this PR" }],
+  },
+  {
+    ...AUTOMATION,
+    automation_id: "auto-3",
+    name: "Slack watcher",
+    enabled: true,
+    run_as: { type: "creator" },
+    created_by: { type: "service_user", id: "svc-9", name: null },
+    triggers: [{ event_type: "slack:message", trigger_id: "trig-3" }],
+    actions: [
+      {
+        type: "monitor_session",
+        setup_prompt: "watch",
+        slack_monitor_config: { source_channel_id: "C1" },
+      },
+    ],
+  },
+];
+
+export const AUTOMATION_SCHEMAS = {
+  skills_serve_playbooks: true,
+  default_net_policy: { allow: [{ hostname: "git-manager.devin.ai" }] },
+  security_profile: null,
+  update_semantics: "merge_patch",
+  available_devin_modes: ["normal", "fast"],
+  default_fallback_devin_mode: "normal",
+  script_check_available: true,
+  sources: {
+    github: {
+      push: {
+        event_type: "github:push",
+        name: "Push",
+        category: "github",
+        supported_replies: ["post_response"],
+        fields: {
+          "repository.full_name": {
+            type: "github_repo",
+            label: "Repository",
+            required: true,
+          },
+        },
+      },
+      pull_request: {
+        event_type: "github:pull_request",
+        name: "Pull request",
+        category: "github",
+        supported_replies: ["post_response", "attach_thread"],
+        fields: {},
+      },
+    },
+    schedule: {
+      recurring: {
+        event_type: "schedule:recurring",
+        name: "Recurring schedule",
+        category: "schedule",
+        supported_replies: [],
+        fields: {},
+      },
+    },
+  },
+};
+
+export const AUTOMATION_TEMPLATES = {
+  templates: [
+    {
+      template_id: "monitor-bugs-slack",
+      name: "Triage Bug Reports",
+      description: "Watches a Slack channel for bug reports.",
+      category: "Monitoring & Triage",
+      required_integrations: ["slack"],
+      required_mcps: [],
+      featured: true,
+      docs_url: null,
+      triggers: [{ event_type: "slack:message", conditions: null, replies: [] }],
+      actions: [
+        {
+          type: "monitor_session",
+          setup_prompt: "triage the bug",
+          slack_monitor_config: { source_channel_id: "", team_id: null },
+        },
+      ],
+    },
+    {
+      template_id: "customer-support-triage",
+      name: "Triage Support Requests",
+      description: "Watches your support channel.",
+      category: "Monitoring & Triage",
+      required_integrations: ["slack"],
+      required_mcps: ["github"],
+      featured: false,
+      docs_url: "https://example.com/docs",
+      triggers: [{ event_type: "slack:message", conditions: null, replies: [] }],
+      actions: [{ type: "start_session", prompt: "triage" }],
+    },
+  ],
+};
+
+// ---- schedules (deprecated) ----
+
+export const SCHEDULE = {
+  scheduled_session_id: "sched-1",
+  org_id: "org-x",
+  name: "Weekly report",
+  prompt: "generate the weekly report",
+  playbook: null,
+  frequency: "0 9 * * 1",
+  interval_count: 1,
+  schedule_type: "recurring",
+  scheduled_at: null,
+  enabled: true,
+  notify_on: "failure",
+  agent: "devin",
+  bypass_approval: false,
+  consecutive_failures: 0,
+  created_by: "user-1",
+  created_at: "2026-01-01T00:00:00Z",
+  updated_at: "2026-01-02T00:00:00Z",
+  last_edited_by: null,
+  last_executed_at: "2026-01-06T09:00:00Z",
+  last_error_at: null,
+  last_error_message: null,
+  platform: null,
+  skill_ref: null,
+  slack_channel_id: null,
+  slack_team_id: null,
+  tags: ["weekly"],
+  target_devin_id: null,
+};
+
+export const SCHEDULES = [
+  SCHEDULE,
+  {
+    ...SCHEDULE,
+    scheduled_session_id: "sched-2",
+    name: "Daily sync",
+    frequency: "0 8 * * *",
+    enabled: false,
+    notify_on: "always",
+    tags: null,
+  },
+  {
+    ...SCHEDULE,
+    scheduled_session_id: "sched-3",
+    name: "One-off migration",
+    schedule_type: "one_time",
+    scheduled_at: "2026-02-01T00:00:00Z",
+    frequency: null,
+    agent: "data_analyst",
+  },
+];
+
 export const PROBLEM = (status: number, detail: string) => ({
   type: "about:blank",
   title: "Error",
@@ -358,6 +616,125 @@ export const SNAPSHOT_BUILDS_PAGE2 = {
   total: 2,
 };
 
+// ---- sessions fixtures ----
+const SESSION_BASE = {
+  acus_consumed: 1.25,
+  automation_id: null,
+  category: "bug_fixing",
+  child_session_ids: null,
+  devin_mode: "normal",
+  is_archived: false,
+  on_demand_usage: null,
+  org_id: "org-x",
+  origin: "api",
+  parent_session_id: null,
+  playbook_id: null,
+  pull_requests: [{ pr_state: "open", pr_url: "https://github.com/o/r/pull/1" }],
+  security_profile: null,
+  service_user_id: null,
+  status_detail: "working",
+  structured_output: null,
+  subcategory: null,
+  user_id: "user-1",
+};
+
+export const SESSION_1 = {
+  ...SESSION_BASE,
+  session_id: "sess-1",
+  status: "running",
+  title: "Fix login bug",
+  tags: ["bug", "backend"],
+  created_at: 1767567600, // 2026-01-05T01:00:00Z
+  updated_at: 1767571200,
+  url: "https://app.devin.ai/sessions/sess-1",
+};
+
+export const SESSION_2 = {
+  ...SESSION_BASE,
+  session_id: "sess-2",
+  status: "exit",
+  status_detail: "finished",
+  title: "Add tests",
+  tags: [],
+  created_at: 1767481200,
+  updated_at: 1767484800,
+  url: "https://app.devin.ai/sessions/sess-2",
+};
+
+export const SESSION_3 = {
+  ...SESSION_BASE,
+  session_id: "sess-3",
+  status: "suspended",
+  status_detail: "inactivity",
+  title: "Refactor parser",
+  tags: ["refactor"],
+  created_at: 1767394800,
+  updated_at: 1767398400,
+  url: "https://app.devin.ai/sessions/sess-3",
+};
+
+export const SESSIONS = [SESSION_1, SESSION_2, SESSION_3];
+const SESSION_BY_ID = new Map(SESSIONS.map((s) => [s.session_id, s]));
+
+const INSIGHT_EXTRAS = {
+  num_devin_messages: 12,
+  num_user_messages: 5,
+  session_size: "m",
+  analysis_status: "completed",
+  analysis: { classification: { category: "bug_fixing", confidence: 0.9 } },
+};
+export const SESSION_INSIGHTS = { ...SESSION_1, ...INSIGHT_EXTRAS };
+export const SESSION_INSIGHTS_2 = { ...SESSION_2, ...INSIGHT_EXTRAS };
+export const SESSION_INSIGHTS_3 = { ...SESSION_3, ...INSIGHT_EXTRAS };
+export const SESSION_INSIGHTS_LIST = [SESSION_INSIGHTS, SESSION_INSIGHTS_2, SESSION_INSIGHTS_3];
+
+export const SESSION_MESSAGE = (n: number) => ({
+  created_at: 1767567600 + n * 60,
+  event_id: `evt-${n}`,
+  message: n % 2 === 0 ? `user message ${n}` : `devin reply ${n}\nwith details`,
+  origin: "api",
+  source: n % 2 === 0 ? "user" : "devin",
+  user_id: n % 2 === 0 ? "user-1" : null,
+  username: n % 2 === 0 ? "Test User" : null,
+});
+export const SESSION_MESSAGES = [1, 2, 3, 4, 5].map(SESSION_MESSAGE);
+
+export const SESSION_ATTACHMENTS = [
+  {
+    attachment_id: "att-1",
+    content_type: "image/png",
+    name: "screenshot.png",
+    source: "user",
+    url: "https://files.example.com/att-1",
+  },
+  {
+    attachment_id: "att-2",
+    content_type: "text/plain",
+    name: "log.txt",
+    source: "devin",
+    url: "https://files.example.com/att-2",
+  },
+];
+
+export const SESSION_TAGS = ["bug", "backend"];
+
+// cursor ページネーションの fake 実装。cursor は offset の 10 進文字列、
+// first は見ずに pageSize 件ずつ返す (CLI のカーソル追従を試すため)
+function paginate<T>(items: T[], q: URLSearchParams, pageSize = 2) {
+  const after = q.get("after");
+  const offset = after ? Number(after) : 0;
+  const slice = items.slice(offset, offset + pageSize);
+  const next = offset + pageSize;
+  return {
+    items: slice,
+    end_cursor: next < items.length ? String(next) : null,
+    has_next_page: next < items.length,
+    total: items.length,
+  };
+}
+
+const findSession = (id: string) => SESSION_BY_ID.get(id) ?? null;
+
 const PROXY_PAGE = `<!DOCTYPE html>
 <html><head><title>502 Bad Gateway</title></head>
 <body><center><h1>502 Bad Gateway</h1></center><hr><center>nginx</center></body></html>
@@ -368,7 +745,7 @@ export type Logged = {
   path: string;
   query: URLSearchParams;
   auth: string | null;
-  body: string;
+  body?: unknown;
 };
 
 export type FakeOptions = {
@@ -381,6 +758,51 @@ export type FakeOptions = {
 
 export type Fake = { url: string; log: Logged[]; stop: () => void };
 
+const intParam = (v: string | null, dflt: number) => {
+  const n = v === null ? NaN : Number(v);
+  return Number.isFinite(n) ? n : dflt;
+};
+
+// notes / automations 用のカーソルページング。after は先頭からの index。
+// 1 ページの上限を 2 件にして、複数ページを必ず踏むようにする
+function cursorPage<T>(u: URL, items: T[]): unknown {
+  const first = Math.min(Math.max(1, intParam(u.searchParams.get("first"), 200)), 2);
+  const after = Math.max(0, intParam(u.searchParams.get("after"), 0));
+  const slice = items.slice(after, after + first);
+  const end = after + slice.length;
+  const hasNext = end < items.length;
+  return {
+    items: slice,
+    end_cursor: hasNext ? String(end) : null,
+    has_next_page: hasNext,
+    total: items.length,
+  };
+}
+
+// schedules 用。生成クライアントは limit / offset を使う
+function offsetPage<T>(u: URL, items: T[]): unknown {
+  const limit = Math.min(Math.max(1, intParam(u.searchParams.get("limit"), 200)), 2);
+  const offset = Math.max(0, intParam(u.searchParams.get("offset"), 0));
+  const slice = items.slice(offset, offset + limit);
+  const hasNext = offset + slice.length < items.length;
+  return {
+    items: slice,
+    end_cursor: hasNext ? String(offset + slice.length) : null,
+    has_next_page: hasNext,
+    total: items.length,
+  };
+}
+
+async function readBody(req: Request): Promise<unknown> {
+  const text = await req.text();
+  if (!text) return null;
+  try {
+    return JSON.parse(text) as unknown;
+  } catch {
+    return text;
+  }
+}
+
 export function startFake(options: FakeOptions = {}): Fake {
   const log: Logged[] = [];
   const server = Bun.serve({
@@ -389,7 +811,8 @@ export function startFake(options: FakeOptions = {}): Fake {
     async fetch(req) {
       const u = new URL(req.url);
       const auth = req.headers.get("authorization");
-      const body = await req.text();
+      // POST/PUT の body を検査できるよう記録する。JSON でなければ生テキスト、空なら null
+      const body = await readBody(req);
       log.push({ method: req.method, path: u.pathname, query: u.searchParams, auth, body });
 
       if (options.proxyStatus)
@@ -409,6 +832,82 @@ export function startFake(options: FakeOptions = {}): Fake {
 
       if (u.pathname === "/v3/self" && req.method === "GET")
         return Response.json(options.selfBody ?? SELF_PAT);
+
+      // knowledge notes
+      if (
+        /^\/v3\/organizations\/[^/]+\/knowledge\/folders$/.test(u.pathname) &&
+        req.method === "GET"
+      )
+        return Response.json(KNOWLEDGE_FOLDERS);
+      if (u.pathname.endsWith("/knowledge/notes")) {
+        if (req.method === "GET") return Response.json(cursorPage(u, KNOWLEDGE_NOTES));
+        if (req.method === "POST")
+          return Response.json(
+            {
+              ...KNOWLEDGE_NOTE,
+              ...(body as Record<string, unknown>),
+              note_id: "note-new",
+              created_at: 1767225600,
+              updated_at: 1767225600,
+            },
+            { status: 201 },
+          );
+      }
+      const noteMatch = /\/knowledge\/notes\/([^/]+)$/.exec(u.pathname);
+      if (noteMatch) {
+        if (req.method === "GET") return Response.json(KNOWLEDGE_NOTE);
+        if (req.method === "PUT")
+          return Response.json({ ...KNOWLEDGE_NOTE, ...(body as Record<string, unknown>) });
+        if (req.method === "DELETE") return Response.json(KNOWLEDGE_NOTE);
+      }
+
+      // automations。schemas / templates は /{id} より先に判定する
+      if (
+        /^\/v3\/organizations\/[^/]+\/automations\/schemas$/.test(u.pathname) &&
+        req.method === "GET"
+      )
+        return Response.json(AUTOMATION_SCHEMAS);
+      if (
+        /^\/v3\/organizations\/[^/]+\/automations\/templates$/.test(u.pathname) &&
+        req.method === "GET"
+      )
+        return Response.json(AUTOMATION_TEMPLATES);
+      if (u.pathname.endsWith("/automations")) {
+        if (req.method === "GET") return Response.json(cursorPage(u, AUTOMATIONS));
+        if (req.method === "POST")
+          return Response.json(
+            {
+              ...AUTOMATION,
+              ...(body as Record<string, unknown>),
+              automation_id: "auto-new",
+            },
+            { status: 201 },
+          );
+      }
+      const autoMatch = /\/automations\/([^/]+)$/.exec(u.pathname);
+      if (autoMatch) {
+        if (req.method === "GET") return Response.json(AUTOMATION);
+        if (req.method === "PATCH")
+          return Response.json({ ...AUTOMATION, ...(body as Record<string, unknown>) });
+        if (req.method === "DELETE") return Response.json(AUTOMATION);
+      }
+
+      // schedules
+      if (u.pathname.endsWith("/schedules")) {
+        if (req.method === "GET") return Response.json(offsetPage(u, SCHEDULES));
+        if (req.method === "POST")
+          return Response.json(
+            { ...SCHEDULE, ...(body as Record<string, unknown>) },
+            { status: 201 },
+          );
+      }
+      const schedMatch = /\/schedules\/([^/]+)$/.exec(u.pathname);
+      if (schedMatch) {
+        if (req.method === "GET") return Response.json(SCHEDULE);
+        if (req.method === "PATCH")
+          return Response.json({ ...SCHEDULE, ...(body as Record<string, unknown>) });
+        if (req.method === "DELETE") return Response.json(SCHEDULE);
+      }
 
       if (
         /^\/v3\/organizations\/[^/]+\/consumption\/daily$/.test(u.pathname) &&
@@ -553,6 +1052,60 @@ export function startFake(options: FakeOptions = {}): Fake {
         u.pathname,
       );
       if (buildMatch && req.method === "GET") return Response.json(SNAPSHOT_BUILD);
+
+      // ---- sessions (org scope) ----
+      // /sessions/insights と /sessions は {devin_id} より先に判定する
+      // ("insights" が devin_id に見えるため)
+      if (/^\/v3\/organizations\/[^/]+\/sessions\/insights$/.test(u.pathname)) {
+        if (req.method === "GET")
+          return Response.json(paginate(SESSION_INSIGHTS_LIST, u.searchParams));
+      }
+      if (/^\/v3\/organizations\/[^/]+\/sessions$/.test(u.pathname)) {
+        if (req.method === "GET") return Response.json(paginate(SESSIONS, u.searchParams));
+        if (req.method === "POST") {
+          const b = (body ?? {}) as Record<string, unknown>;
+          return Response.json({
+            ...SESSION_1,
+            session_id: "sess-new",
+            title: typeof b.title === "string" ? b.title : "New session",
+            tags: Array.isArray(b.tags) ? b.tags : [],
+            url: "https://app.devin.ai/sessions/sess-new",
+          });
+        }
+      }
+
+      const sessSub = /^\/v3\/organizations\/[^/]+\/sessions\/([^/]+)(\/[a-z]+)?$/.exec(u.pathname);
+      if (sessSub) {
+        const [, id, sub] = sessSub;
+        const s = findSession(id ?? "");
+        if (!s) return Response.json(PROBLEM(404, "session not found"), { status: 404 });
+        if (sub === "/messages" && req.method === "GET")
+          return Response.json(paginate(SESSION_MESSAGES, u.searchParams));
+        if (sub === "/insights" && req.method === "GET")
+          return Response.json(
+            SESSION_INSIGHTS_LIST.find((i) => i.session_id === s.session_id) ?? SESSION_INSIGHTS,
+          );
+        if (sub === "/attachments" && req.method === "GET")
+          return Response.json(SESSION_ATTACHMENTS);
+        if (sub === "/archive" && req.method === "POST")
+          return Response.json({ ...s, is_archived: true });
+        if (sub === "/tags") {
+          if (req.method === "GET") return Response.json({ tags: SESSION_TAGS });
+          const tags = Array.isArray((body as { tags?: unknown })?.tags)
+            ? ((body as { tags: unknown[] }).tags as string[])
+            : [];
+          if (req.method === "POST") {
+            const merged = [...new Set([...SESSION_TAGS, ...tags])];
+            return Response.json({ tags: merged });
+          }
+          if (req.method === "PUT") return Response.json({ tags });
+        }
+        if (sub === undefined) {
+          if (req.method === "GET") return Response.json(s);
+          if (req.method === "DELETE")
+            return Response.json({ ...s, status: "exit", status_detail: "finished" });
+        }
+      }
 
       return Response.json(PROBLEM(404, "no route"), { status: 404 });
     },
