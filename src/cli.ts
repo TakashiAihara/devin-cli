@@ -20,6 +20,12 @@ import {
   runRepositoriesList,
 } from "./commands/repositories.ts";
 import { runSelf } from "./commands/self.ts";
+import {
+  runCodeScanFindings,
+  runCodeScanMetrics,
+  runCodeScanProfiles,
+  runCodeScanScans,
+} from "./commands/code-scans.ts";
 import { VERSION } from "./version.ts";
 
 const JSON_FLAG = "--json";
@@ -82,6 +88,34 @@ const branchOption = () =>
   new Option("--branch <name>", "indexing 対象ブランチ (繰り返し指定可)")
     .argParser((value: string, prev: string[]) => [...prev, value])
     .default([]);
+// 値域を検査しつつ繰り返し指定できるオプション (--severity 等)
+const enumListOption = (flag: string, desc: string, values: string[]) =>
+  new Option(flag, desc)
+    .argParser((value: string, prev: string[]) => {
+      if (!values.includes(value))
+        throw new InvalidArgumentError(`Allowed choices are ${values.join(", ")}.`);
+      return [...prev, value];
+    })
+    .default([]);
+
+// code-scans の enum 値域 (api.schemas.ts の union と対応)
+const FINDING_SEVERITIES = ["critical", "high", "medium", "low"];
+const FINDING_STATUSES = ["open", "dismissed", "resolved"];
+const FINDING_PAYOFFS = ["quick_win", "big_fix", "easy_fix", "deprioritize"];
+const SCAN_TYPES = [
+  "security",
+  "performance",
+  "db-queries",
+  "test-coverage",
+  "dead-code",
+  "code-quality",
+  "cleanup",
+  "telemetry",
+  "accessibility",
+  "compliance",
+  "general",
+  "migration-docs",
+];
 
 program
   .command("self")
@@ -314,6 +348,118 @@ repositories
       await runIndexingBranchDelete({ path, branch, org: opts.org, json: opts.json === true }),
     );
   });
+
+const codeScans = program
+  .command("code-scans")
+  .description("code scan の findings / metrics / scans / profiles (read のみ)");
+
+codeScans
+  .command("findings")
+  .description("code scan findings 一覧 (GET /code-scans/findings)")
+  .addOption(limitOption())
+  .addOption(new Option("--repo <name>", "このリポジトリの findings に絞る"))
+  .addOption(new Option("--scan <id>", "この scan が出した findings に絞る"))
+  .addOption(new Option("--q <text>", "title/description/file path のテキスト検索"))
+  .addOption(enumListOption("--severity <s>", "severity で絞る (繰り返し可)", FINDING_SEVERITIES))
+  .addOption(enumListOption("--status <s>", "status で絞る (繰り返し可)", FINDING_STATUSES))
+  .addOption(enumListOption("--payoff <p>", "payoff で絞る (繰り返し可)", FINDING_PAYOFFS))
+  .addOption(orgOption())
+  .addOption(jsonOption())
+  .action(
+    async (opts: {
+      limit?: number;
+      repo?: string;
+      scan?: string;
+      q?: string;
+      severity: string[];
+      status: string[];
+      payoff: string[];
+      org?: string;
+      json?: boolean;
+    }) => {
+      process.exit(
+        await runCodeScanFindings({
+          limit: opts.limit,
+          repo: opts.repo,
+          scan: opts.scan,
+          q: opts.q,
+          severity: opts.severity,
+          status: opts.status,
+          payoff: opts.payoff,
+          org: opts.org,
+          json: opts.json === true,
+        }),
+      );
+    },
+  );
+
+codeScans
+  .command("metrics")
+  .description("code scan の集計 metrics (GET /code-scans/metrics。time 範囲は必須)")
+  .addOption(daysOption())
+  .addOption(orgOption())
+  .addOption(jsonOption())
+  .action(async (opts: { days: number; org?: string; json?: boolean }) => {
+    process.exit(
+      await runCodeScanMetrics({ days: opts.days, org: opts.org, json: opts.json === true }),
+    );
+  });
+
+codeScans
+  .command("scans")
+  .description("code scan 一覧 (GET /code-scans/scans)")
+  .addOption(limitOption())
+  .addOption(new Option("--repo <name>", "このリポジトリを scan したものに絞る"))
+  .addOption(new Option("--type <name>", "scan type で絞る").choices(SCAN_TYPES))
+  .addOption(
+    new Option("--days <n>", "作成日時が直近 N 暦日のものに絞る (省略時は全期間)").argParser(days),
+  )
+  .addOption(orgOption())
+  .addOption(jsonOption())
+  .action(
+    async (opts: {
+      limit?: number;
+      repo?: string;
+      type?: string;
+      days?: number;
+      org?: string;
+      json?: boolean;
+    }) => {
+      process.exit(
+        await runCodeScanScans({
+          limit: opts.limit,
+          repo: opts.repo,
+          type: opts.type,
+          days: opts.days,
+          org: opts.org,
+          json: opts.json === true,
+        }),
+      );
+    },
+  );
+
+codeScans
+  .command("profiles")
+  .description("code scan profile 一覧 / 詳細 (GET /code-scans/profiles[/{id}])")
+  .argument("[profile_id]", "profile ID (省略時は一覧)")
+  .addOption(limitOption())
+  .addOption(orgOption())
+  .addOption(jsonOption())
+  .action(
+    async (
+      profileId: string | undefined,
+      opts: { limit?: number; org?: string; json?: boolean },
+    ) => {
+      process.exit(
+        await runCodeScanProfiles({
+          profileId,
+          limit: opts.limit,
+          org: opts.org,
+          json: opts.json === true,
+        }),
+      );
+    },
+  );
 
 program
   .command("completion")

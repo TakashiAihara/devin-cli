@@ -5,6 +5,11 @@ import {
   deleteOrganizationsOrgIdRepositoriesIndexing as genDeleteIndexingBulk,
   deleteOrganizationsOrgIdRepositoriesRepositoryPathIndexingBranchesBranchName as genDeleteIndexingBranch,
   deleteOrganizationsOrgIdRepositoriesRepositoryPathIndexing as genDeleteIndexingRepo,
+  getOrganizationsOrgIdCodeScansFindings as genCodeScanFindings,
+  getOrganizationsOrgIdCodeScansMetrics as genCodeScanMetrics,
+  getOrganizationsOrgIdCodeScansProfiles as genCodeScanProfiles,
+  getOrganizationsOrgIdCodeScansProfilesProfileId as genCodeScanProfile,
+  getOrganizationsOrgIdCodeScansScans as genCodeScanScans,
   getOrganizationsOrgIdConsumptionDaily as genConsumptionDaily,
   getOrganizationsOrgIdConsumptionDailyServiceUsersServiceUserId as genConsumptionDailyServiceUser,
   getOrganizationsOrgIdConsumptionDailySessionsSessionId as genConsumptionDailySession,
@@ -26,6 +31,10 @@ import {
 } from "../generated/index.ts";
 import type {
   BulkIndexRepositoriesRequest,
+  GetOrganizationsOrgIdCodeScansFindingsParams,
+  GetOrganizationsOrgIdCodeScansMetricsParams,
+  GetOrganizationsOrgIdCodeScansProfilesParams,
+  GetOrganizationsOrgIdCodeScansScansParams,
   GetOrganizationsOrgIdRepositoriesIndexingParams,
   GetOrganizationsOrgIdRepositoriesParams,
   IndexRepositoryRequest,
@@ -44,6 +53,11 @@ export type RepositoryListPage = Awaited<ReturnType<typeof genListRepositories>>
 export type RepositoryIndexingListPage = Awaited<ReturnType<typeof genListIndexing>>;
 export type RepoIndexingStatus = Awaited<ReturnType<typeof genGetIndexingRepo>>;
 export type RepositoryIndexing = Awaited<ReturnType<typeof genPutIndexingRepo>>;
+export type CodeScanFindingPage = Awaited<ReturnType<typeof genCodeScanFindings>>;
+export type CodeScanMetrics = Awaited<ReturnType<typeof genCodeScanMetrics>>;
+export type CodeScanPage = Awaited<ReturnType<typeof genCodeScanScans>>;
+export type CodeScanProfilePage = Awaited<ReturnType<typeof genCodeScanProfiles>>;
+export type CodeScanProfileDetail = Awaited<ReturnType<typeof genCodeScanProfile>>;
 
 const w = (win: Window) => ({ time_after: win.time_after, time_before: win.time_before });
 // 生成コードは path param を素で埋め込むので、こちらで encode して `..` や `?` による
@@ -143,3 +157,26 @@ export const unindexRepositoryBranch = (
   repositoryPath: string,
   branchName: string,
 ) => genDeleteIndexingBranch(enc(orgId), enc(repositoryPath), enc(branchName));
+
+// --- code-scans (org scope、read のみ。scan 作成 / ingestion / remediate は write 系なので未実装) ---
+
+export const codeScanFindings = (
+  orgId: string,
+  params?: GetOrganizationsOrgIdCodeScansFindingsParams,
+) => genCodeScanFindings(enc(orgId), params);
+
+export const codeScanMetrics = (
+  orgId: string,
+  params: GetOrganizationsOrgIdCodeScansMetricsParams,
+) => genCodeScanMetrics(enc(orgId), params);
+
+export const codeScanScans = (orgId: string, params?: GetOrganizationsOrgIdCodeScansScansParams) =>
+  genCodeScanScans(enc(orgId), params);
+
+export const codeScanProfiles = (
+  orgId: string,
+  params?: GetOrganizationsOrgIdCodeScansProfilesParams,
+) => genCodeScanProfiles(enc(orgId), params);
+
+export const codeScanProfile = (orgId: string, profileId: string) =>
+  genCodeScanProfile(enc(orgId), enc(profileId));

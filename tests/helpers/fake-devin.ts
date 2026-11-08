@@ -185,6 +185,110 @@ export const indexingResponse = (repository_path: string) => ({
   branches: ["main"],
 });
 
+// --- code-scans (org scope、read のみ) ---
+
+export const CODE_SCAN_FINDING = {
+  category: "sql-injection",
+  code_owners: ["team-backend"],
+  code_scan_run_id: "run-1",
+  created_at: 1767225600,
+  description: "user input reaches query builder",
+  finding_id: "finding-1",
+  note: null,
+  orchestrator_session_id: "sess-1",
+  payoff: "quick_win",
+  pr_url: null,
+  recommendation: "use parameterized queries",
+  reference_snippets: [],
+  repo_name: "acme/one",
+  scan_id: "scan-1",
+  session_id: null,
+  severity: "high",
+  status: "open",
+  title: "SQL injection in search",
+  updated_at: 1767312000,
+};
+
+export const CODE_SCAN_FINDINGS = {
+  items: [CODE_SCAN_FINDING],
+  end_cursor: null,
+  has_next_page: false,
+  total: 1,
+};
+
+export const CODE_SCAN_METRICS = {
+  avg_pr_open_duration_seconds: 3600,
+  avg_pr_time_to_merge_seconds: 7200,
+  open_critical_findings_count: 1,
+  open_high_findings_count: 2,
+  open_low_findings_count: 0,
+  open_medium_findings_count: 3,
+  prs_closed_count: 1,
+  prs_created_count: 4,
+  prs_merged_count: 2,
+  prs_open_count: 1,
+  repos_scanned_count: 2,
+  scans_count: 3,
+};
+
+export const CODE_SCAN = {
+  created_at: 1767225600,
+  effort: "normal",
+  host: "github.com",
+  org_id: "org-x",
+  profile: { profile_id: "prof-1", name: "security-baseline" },
+  repo_full_name: "acme/one",
+  repo_name: "acme/one",
+  scan_id: "scan-1",
+  scan_type: "security",
+  status: "completed",
+  url: "https://app.devin.ai/code-scan/scan-1",
+};
+
+export const CODE_SCAN_SCANS = {
+  items: [CODE_SCAN],
+  end_cursor: null,
+  has_next_page: false,
+  total: 1,
+};
+
+export const CODE_SCAN_PROFILE_SUMMARY = {
+  created_at: 1767225600,
+  description: "default security profile",
+  mode: "discover",
+  name: "security-baseline",
+  org_id: "org-x",
+  profile_id: "prof-1",
+  scan_type: "security",
+  visibility: "org",
+};
+
+export const CODE_SCAN_PROFILES = {
+  items: [CODE_SCAN_PROFILE_SUMMARY],
+  end_cursor: null,
+  has_next_page: false,
+  total: 1,
+};
+
+export const CODE_SCAN_PROFILE_DETAIL = {
+  ...CODE_SCAN_PROFILE_SUMMARY,
+  batch_size: null,
+  communication_guidance: null,
+  exclude_globs: null,
+  include_globs: ["src/**"],
+  ingestion_source_guidance: null,
+  investigation_guidance: "look for injection",
+  post_ingestion_guidance: null,
+  remediation_guidance: null,
+  report_guidance: null,
+  scan_paths: null,
+  threat_model_guidance: null,
+  triage_guidance: null,
+  type_config: null,
+  validation_guidance: null,
+  validation_severities: ["critical", "high"],
+};
+
 const PROXY_PAGE = `<!DOCTYPE html>
 <html><head><title>502 Bad Gateway</title></head>
 <body><center><h1>502 Bad Gateway</h1></center><hr><center>nginx</center></body></html>
@@ -303,6 +407,32 @@ export function startFake(options: FakeOptions = {}): Fake {
         );
       if (repoBranch && req.method === "DELETE")
         return Response.json(indexingResponse(decodeURIComponent(repoBranch[1] ?? "")));
+
+      // code-scans (org scope、read のみ)
+      if (
+        /^\/v3\/organizations\/[^/]+\/code-scans\/findings$/.test(u.pathname) &&
+        req.method === "GET"
+      )
+        return Response.json(CODE_SCAN_FINDINGS);
+      if (
+        /^\/v3\/organizations\/[^/]+\/code-scans\/metrics$/.test(u.pathname) &&
+        req.method === "GET"
+      )
+        return Response.json(CODE_SCAN_METRICS);
+      if (
+        /^\/v3\/organizations\/[^/]+\/code-scans\/scans$/.test(u.pathname) &&
+        req.method === "GET"
+      )
+        return Response.json(CODE_SCAN_SCANS);
+      if (
+        /^\/v3\/organizations\/[^/]+\/code-scans\/profiles$/.test(u.pathname) &&
+        req.method === "GET"
+      )
+        return Response.json(CODE_SCAN_PROFILES);
+      const profileMatch = /^\/v3\/organizations\/[^/]+\/code-scans\/profiles\/([^/]+)$/.exec(
+        u.pathname,
+      );
+      if (profileMatch && req.method === "GET") return Response.json(CODE_SCAN_PROFILE_DETAIL);
 
       return Response.json(PROBLEM(404, "no route"), { status: 404 });
     },
