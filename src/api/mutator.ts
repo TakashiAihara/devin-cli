@@ -30,6 +30,7 @@ export async function apiFetch<T>(url: string, options: RequestInit = {}): Promi
   const headers = new Headers(options.headers);
   // 前後の空白は落とし、ヘッダ値に使えない文字を含む値は値を出さずに拒否する
   const token = (await secret(API_KEY)).trim();
+  if (!token) throw new ExitError(`${API_KEY} が空か空白だけ`, 2);
   if (!/^[!-~]+$/.test(token))
     throw new ExitError(`${API_KEY} の値を HTTP ヘッダに使えない文字が含まれる`, 2);
   headers.set("authorization", `Bearer ${token}`);

@@ -1,4 +1,6 @@
 import { describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { API_KEY } from "./helpers/fake-devin.ts";
 import { useFake, writeConfig } from "./helpers/cli.ts";
 
@@ -42,14 +44,29 @@ describe("config.toml", () => {
     expect(r.err).toContain("複数行");
   });
 
-  test("孫が pipe を握ったままでも待たずに exit 2", async () => {
+  test("孫が pipe を握ったままでも待たず、process group ごと殺す", async () => {
     // 直下の sh は即終了するが、裏に回した sleep が stdout pipe を持ち続ける。
-    // EOF 猶予のあと process group ごと殺すので、sleep 30 を待たずに終わるはず
-    writeConfig(ctx.sb, 'api_key_command = "sleep 30 &"\n');
+    // EOF 猶予のあと process group ごと殺すので、sleep 30 を待たず、sleep 自体も死ぬはず
+    const pidFile = join(ctx.sb.dir, "sleep.pid");
+    writeConfig(ctx.sb, `api_key_command = "sleep 30 & echo $! > ${pidFile}"\n`);
     const started = Date.now();
     const r = await ctx.run(["self"], { DEVIN_API_KEY: undefined });
     expect(r.code).toBe(2);
     expect(Date.now() - started).toBeLessThan(15_000);
+
+    const pid = Number(readFileSync(pidFile, "utf8").trim());
+    expect(Number.isInteger(pid) && pid > 1).toBe(true);
+    // SIGKILL の反映と zombie の回収を待つため少しだけ猶予を置いて存在確認する
+    let alive = true;
+    for (let i = 0; i < 20 && alive; i++) {
+      try {
+        process.kill(pid, 0);
+        await Bun.sleep(100);
+      } catch {
+        alive = false;
+      }
+    }
+    expect(alive).toBe(false);
   });
 
   test("api_base_url を config で差し替えられる", async () => {
