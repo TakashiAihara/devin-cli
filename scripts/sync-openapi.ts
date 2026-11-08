@@ -24,23 +24,33 @@ export function collectUrls(index: string): string[] {
 
 export type Fragment = { method: string; path: string; doc: Record<string, unknown> };
 
+const isRecord = (v: unknown): v is Record<string, unknown> =>
+  typeof v === "object" && v !== null && !Array.isArray(v);
+
 // フェンス行は ````yaml v3-openapi.yaml GET /v3/self のように method と path が続く。
-// 閉じフェンスは ```` (4 つ以上のバッククォート)
-export function extractFragment(markdown: string): Fragment | null {
+// 1 ページに複数フェンスがあり得るので全て拾って返す。閉じフェンスは ```` (4 つ以上のバッククォート)
+export function extractFragments(markdown: string): Fragment[] {
   const lines = markdown.split("\n");
+  const frags: Fragment[] = [];
   for (let i = 0; i < lines.length; i++) {
-    const m = /^````yaml v3-openapi\.yaml[ \t]+([A-Za-z]+)[ \t]+(\S+?)\s*$/.exec(lines[i] ?? "");
+    const m = /^`{4,}yaml v3-openapi\.yaml[ \t]+([A-Za-z]+)[ \t]+(\S+?)\s*$/.exec(lines[i] ?? "");
     if (!m) continue;
     const body: string[] = [];
+    let end = lines.length;
     for (let j = i + 1; j < lines.length; j++) {
       const line = lines[j] ?? "";
-      if (/^`{4,}\s*$/.test(line)) break;
+      if (/^`{4,}\s*$/.test(line)) {
+        end = j;
+        break;
+      }
       body.push(line);
     }
-    const doc = parse(body.join("\n")) as Record<string, unknown>;
-    return { method: (m[1] as string).toUpperCase(), path: m[2] as string, doc };
+    const parsed: unknown = parse(body.join("\n"));
+    const doc: Record<string, unknown> = isRecord(parsed) ? parsed : {};
+    frags.push({ method: (m[1] as string).toUpperCase(), path: m[2] as string, doc });
+    i = end; // 閉じフェンスの次の行から探し直す (end === lines.length なら走査終了)
   }
-  return null;
+  return frags;
 }
 
 // キー順を正規化した JSON。fragment 間の「同じ内容か」の比較に使う
@@ -56,56 +66,73 @@ function canonical(v: unknown): string {
 
 export type MergedSpec = {
   paths: Record<string, Record<string, unknown>>;
-  schemas: Record<string, unknown>;
-  securitySchemes: Record<string, unknown>;
+  // components を section 名で generic に保持する。値は通常 name → 定義 の map で、
+  // map でないセクション値 (x- 拡張のスカラー等) は生の値のまま入る
+  components: Record<string, unknown>;
 };
 
 const HTTP_METHODS = new Set(["get", "post", "put", "patch", "delete", "head", "options", "trace"]);
 
+// components の 1 セクションをマージする。値が name → 定義 の map ならエントリ単位、
+// そうでなければセクション単位で、dedupe + 内容不一致 throw (schemas と同じ方針)
+function mergeComponentSection(
+  components: Record<string, unknown>,
+  section: string,
+  value: unknown,
+): void {
+  const prev = components[section];
+  if (isRecord(prev) && isRecord(value)) {
+    for (const [name, def] of Object.entries(value)) {
+      const p = prev[name];
+      if (p !== undefined) {
+        if (canonical(p) !== canonical(def))
+          throw new Error(`components.${section}.${name} が fragment 間で内容不一致`);
+        continue;
+      }
+      prev[name] = def;
+    }
+    return;
+  }
+  if (prev !== undefined) {
+    if (canonical(prev) !== canonical(value))
+      throw new Error(`components.${section} が fragment 間で内容不一致`);
+    return;
+  }
+  components[section] = isRecord(value) ? { ...value } : value;
+}
+
 export function mergeFragments(frags: Fragment[]): MergedSpec {
   const paths: MergedSpec["paths"] = {};
-  const schemas: MergedSpec["schemas"] = {};
-  const securitySchemes: MergedSpec["securitySchemes"] = {};
+  const components: MergedSpec["components"] = {};
 
   for (const frag of frags) {
-    const fragPaths = (frag.doc.paths ?? {}) as Record<string, Record<string, unknown>>;
-    for (const [p, item] of Object.entries(fragPaths)) {
-      const target = (paths[p] ??= {});
-      for (const [method, op] of Object.entries(item)) {
-        if (!HTTP_METHODS.has(method.toLowerCase())) continue;
-        const key = method.toLowerCase();
-        const prev = target[key];
-        if (prev !== undefined) {
-          if (canonical(prev) !== canonical(op))
-            throw new Error(`paths ${p} ${method} が fragment 間で内容不一致`);
-          continue; // 完全一致なら dedupe
+    const fragPaths = frag.doc.paths;
+    if (isRecord(fragPaths)) {
+      for (const [p, item] of Object.entries(fragPaths)) {
+        if (!isRecord(item)) throw new Error(`paths.${p} が Path Item Object でない`);
+        const target = (paths[p] ??= {});
+        for (const [key, op] of Object.entries(item)) {
+          // HTTP method は小文字に正規化。parameters / summary / $ref 等の非 method キーも
+          // method と同じ dedupe + 内容不一致 throw の方針でマージする
+          const mergedKey = HTTP_METHODS.has(key.toLowerCase()) ? key.toLowerCase() : key;
+          const prev = target[mergedKey];
+          if (prev !== undefined) {
+            if (canonical(prev) !== canonical(op))
+              throw new Error(`paths ${p} ${key} が fragment 間で内容不一致`);
+            continue; // 完全一致なら dedupe
+          }
+          target[mergedKey] = op;
         }
-        target[key] = op;
       }
     }
-    const components = frag.doc.components as
-      | { schemas?: Record<string, unknown>; securitySchemes?: Record<string, unknown> }
-      | undefined;
-    for (const [name, schema] of Object.entries(components?.schemas ?? {})) {
-      const prev = schemas[name];
-      if (prev !== undefined) {
-        if (canonical(prev) !== canonical(schema))
-          throw new Error(`components.schemas.${name} が fragment 間で内容不一致`);
-        continue;
+    const fragComponents = frag.doc.components;
+    if (isRecord(fragComponents)) {
+      for (const [section, value] of Object.entries(fragComponents)) {
+        mergeComponentSection(components, section, value);
       }
-      schemas[name] = schema;
-    }
-    for (const [name, scheme] of Object.entries(components?.securitySchemes ?? {})) {
-      const prev = securitySchemes[name];
-      if (prev !== undefined) {
-        if (canonical(prev) !== canonical(scheme))
-          throw new Error(`components.securitySchemes.${name} が fragment 間で内容不一致`);
-        continue;
-      }
-      securitySchemes[name] = scheme;
     }
   }
-  return { paths, schemas, securitySchemes };
+  return { paths, components };
 }
 
 const pascal = (s: string) =>
@@ -135,17 +162,22 @@ export function buildDocument(merged: MergedSpec): Record<string, unknown> {
   const paths: Record<string, Record<string, unknown>> = {};
   const seen = new Map<string, string>();
   for (const [p, item] of Object.entries(sortKeys(merged.paths))) {
-    const methods: Record<string, unknown> = {};
-    for (const [method, op] of Object.entries(item)) {
-      const o = op as Record<string, unknown>;
-      const opId = normalizeOperationId(method, p);
+    const pathItem: Record<string, unknown> = {};
+    for (const [key, op] of Object.entries(item)) {
+      // parameters / summary / $ref / servers 等の非 method キーは operationId を付けずそのまま
+      if (!HTTP_METHODS.has(key.toLowerCase())) {
+        pathItem[key] = op;
+        continue;
+      }
+      if (!isRecord(op)) throw new Error(`paths ${p} ${key} の operation が Object でない`);
+      const opId = normalizeOperationId(key, p);
       const prev = seen.get(opId);
       if (prev !== undefined)
-        throw new Error(`operationId ${opId} が重複: ${prev} と ${method.toUpperCase()} ${p}`);
-      seen.set(opId, `${method.toUpperCase()} ${p}`);
-      methods[method] = { ...o, operationId: opId };
+        throw new Error(`operationId ${opId} が重複: ${prev} と ${key.toUpperCase()} ${p}`);
+      seen.set(opId, `${key.toUpperCase()} ${p}`);
+      pathItem[key] = { ...op, operationId: opId };
     }
-    paths[p] = methods;
+    paths[p] = pathItem;
   }
   return {
     openapi: "3.1.0",
@@ -157,10 +189,12 @@ export function buildDocument(merged: MergedSpec): Record<string, unknown> {
     servers: [{ url: SERVER_URL }],
     security: [{ bearerAuth: [] }],
     paths,
-    components: {
-      schemas: sortKeys(merged.schemas),
-      securitySchemes: sortKeys(merged.securitySchemes),
-    },
+    components: Object.fromEntries(
+      Object.entries(sortKeys(merged.components)).map(([section, value]) => [
+        section,
+        isRecord(value) ? sortKeys(value) : value,
+      ]),
+    ),
   };
 }
 
@@ -170,8 +204,8 @@ async function fetchText(url: string): Promise<string> {
   return res.text();
 }
 
-async function fetchPage(url: string): Promise<Fragment | null> {
-  return extractFragment(await fetchText(url));
+async function fetchPage(url: string): Promise<Fragment[]> {
+  return extractFragments(await fetchText(url));
 }
 
 async function pool<T, R>(items: T[], n: number, fn: (t: T) => Promise<R>): Promise<R[]> {
@@ -208,8 +242,8 @@ async function main(): Promise<void> {
 
   const frags: Fragment[] = [];
   const skipped: string[] = [];
-  results.forEach((frag, i) => {
-    if (frag) frags.push(frag);
+  results.forEach((pageFrags, i) => {
+    if (pageFrags.length > 0) frags.push(...pageFrags);
     else skipped.push(urls[i] as string);
   });
   if (skipped.length > 0) {
@@ -234,8 +268,10 @@ async function main(): Promise<void> {
   const yamlText = stringify(doc);
   mkdirSync(dirname(OUTPUT_PATH), { recursive: true });
   writeFileSync(OUTPUT_PATH, yamlText);
+  const schemas = merged.components["schemas"];
+  const schemaCount = isRecord(schemas) ? Object.keys(schemas).length : 0;
   console.log(
-    `wrote ${OUTPUT_PATH}: ${urls.length} ページ中 ${frags.length} fragment, ${pathCount} paths, ${Object.keys(merged.schemas).length} schemas`,
+    `wrote ${OUTPUT_PATH}: ${urls.length} ページ中 ${frags.length} fragment, ${pathCount} paths, ${schemaCount} schemas`,
   );
 }
 
