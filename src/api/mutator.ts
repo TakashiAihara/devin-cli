@@ -44,7 +44,11 @@ export async function apiFetch<T>(url: string, options: RequestInit = {}): Promi
       );
     throw new ExitError(`Devin API が HTTP ${res.status} を返した: ${detail}`, 1);
   }
-  if (res.raw === "") throw new ExitError(`Devin API が空の応答を返した (HTTP ${res.status})`, 70);
+  // 204/205 は成功・内容なしが正常なので undefined を返す。それ以外の空 body は異常
+  if (res.raw === "") {
+    if (res.status === 204 || res.status === 205) return undefined as T;
+    throw new ExitError(`Devin API が空の応答を返した (HTTP ${res.status})`, 70);
+  }
   try {
     return JSON.parse(res.raw) as T;
   } catch {
