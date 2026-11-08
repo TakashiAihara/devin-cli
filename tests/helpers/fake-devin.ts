@@ -81,12 +81,137 @@ export const PROBLEM = (status: number, detail: string) => ({
   detail,
 });
 
+// ---- sessions fixtures ----
+const SESSION_BASE = {
+  acus_consumed: 1.25,
+  automation_id: null,
+  category: "bug_fixing",
+  child_session_ids: null,
+  devin_mode: "normal",
+  is_archived: false,
+  on_demand_usage: null,
+  org_id: "org-x",
+  origin: "api",
+  parent_session_id: null,
+  playbook_id: null,
+  pull_requests: [{ pr_state: "open", pr_url: "https://github.com/o/r/pull/1" }],
+  security_profile: null,
+  service_user_id: null,
+  status_detail: "working",
+  structured_output: null,
+  subcategory: null,
+  user_id: "user-1",
+};
+
+export const SESSION_1 = {
+  ...SESSION_BASE,
+  session_id: "sess-1",
+  status: "running",
+  title: "Fix login bug",
+  tags: ["bug", "backend"],
+  created_at: 1767567600, // 2026-01-05T01:00:00Z
+  updated_at: 1767571200,
+  url: "https://app.devin.ai/sessions/sess-1",
+};
+
+export const SESSION_2 = {
+  ...SESSION_BASE,
+  session_id: "sess-2",
+  status: "exit",
+  status_detail: "finished",
+  title: "Add tests",
+  tags: [],
+  created_at: 1767481200,
+  updated_at: 1767484800,
+  url: "https://app.devin.ai/sessions/sess-2",
+};
+
+export const SESSION_3 = {
+  ...SESSION_BASE,
+  session_id: "sess-3",
+  status: "suspended",
+  status_detail: "inactivity",
+  title: "Refactor parser",
+  tags: ["refactor"],
+  created_at: 1767394800,
+  updated_at: 1767398400,
+  url: "https://app.devin.ai/sessions/sess-3",
+};
+
+export const SESSIONS = [SESSION_1, SESSION_2, SESSION_3];
+const SESSION_BY_ID = new Map(SESSIONS.map((s) => [s.session_id, s]));
+
+const INSIGHT_EXTRAS = {
+  num_devin_messages: 12,
+  num_user_messages: 5,
+  session_size: "m",
+  analysis_status: "completed",
+  analysis: { classification: { category: "bug_fixing", confidence: 0.9 } },
+};
+export const SESSION_INSIGHTS = { ...SESSION_1, ...INSIGHT_EXTRAS };
+export const SESSION_INSIGHTS_2 = { ...SESSION_2, ...INSIGHT_EXTRAS };
+export const SESSION_INSIGHTS_3 = { ...SESSION_3, ...INSIGHT_EXTRAS };
+export const SESSION_INSIGHTS_LIST = [SESSION_INSIGHTS, SESSION_INSIGHTS_2, SESSION_INSIGHTS_3];
+
+export const SESSION_MESSAGE = (n: number) => ({
+  created_at: 1767567600 + n * 60,
+  event_id: `evt-${n}`,
+  message: n % 2 === 0 ? `user message ${n}` : `devin reply ${n}\nwith details`,
+  origin: "api",
+  source: n % 2 === 0 ? "user" : "devin",
+  user_id: n % 2 === 0 ? "user-1" : null,
+  username: n % 2 === 0 ? "Test User" : null,
+});
+export const SESSION_MESSAGES = [1, 2, 3, 4, 5].map(SESSION_MESSAGE);
+
+export const SESSION_ATTACHMENTS = [
+  {
+    attachment_id: "att-1",
+    content_type: "image/png",
+    name: "screenshot.png",
+    source: "user",
+    url: "https://files.example.com/att-1",
+  },
+  {
+    attachment_id: "att-2",
+    content_type: "text/plain",
+    name: "log.txt",
+    source: "devin",
+    url: "https://files.example.com/att-2",
+  },
+];
+
+export const SESSION_TAGS = ["bug", "backend"];
+
+// cursor ページネーションの fake 実装。cursor は offset の 10 進文字列、
+// first は見ずに pageSize 件ずつ返す (CLI のカーソル追従を試すため)
+function paginate<T>(items: T[], q: URLSearchParams, pageSize = 2) {
+  const after = q.get("after");
+  const offset = after ? Number(after) : 0;
+  const slice = items.slice(offset, offset + pageSize);
+  const next = offset + pageSize;
+  return {
+    items: slice,
+    end_cursor: next < items.length ? String(next) : null,
+    has_next_page: next < items.length,
+    total: items.length,
+  };
+}
+
+const findSession = (id: string) => SESSION_BY_ID.get(id) ?? null;
+
 const PROXY_PAGE = `<!DOCTYPE html>
 <html><head><title>502 Bad Gateway</title></head>
 <body><center><h1>502 Bad Gateway</h1></center><hr><center>nginx</center></body></html>
 `;
 
-export type Logged = { method: string; path: string; query: URLSearchParams; auth: string | null };
+export type Logged = {
+  method: string;
+  path: string;
+  query: URLSearchParams;
+  auth: string | null;
+  body?: unknown;
+};
 
 export type FakeOptions = {
   selfBody?: unknown;
@@ -106,7 +231,12 @@ export function startFake(options: FakeOptions = {}): Fake {
     async fetch(req) {
       const u = new URL(req.url);
       const auth = req.headers.get("authorization");
-      log.push({ method: req.method, path: u.pathname, query: u.searchParams, auth });
+      // POST/PUT の body を検査できるよう記録する (GET は undefined)
+      const body =
+        req.method === "GET" || req.method === "DELETE"
+          ? undefined
+          : await req.json().catch(() => undefined);
+      log.push({ method: req.method, path: u.pathname, query: u.searchParams, auth, body });
 
       if (options.proxyStatus)
         return new Response(PROXY_PAGE, {
@@ -164,6 +294,60 @@ export function startFake(options: FakeOptions = {}): Fake {
             return Response.json(METRICS_ACTIVE_USERS);
           case "active-users":
             return Response.json(METRICS_ACTIVE_USERS[0]);
+        }
+      }
+
+      // ---- sessions (org scope) ----
+      // /sessions/insights と /sessions は {devin_id} より先に判定する
+      // ("insights" が devin_id に見えるため)
+      if (/^\/v3\/organizations\/[^/]+\/sessions\/insights$/.test(u.pathname)) {
+        if (req.method === "GET")
+          return Response.json(paginate(SESSION_INSIGHTS_LIST, u.searchParams));
+      }
+      if (/^\/v3\/organizations\/[^/]+\/sessions$/.test(u.pathname)) {
+        if (req.method === "GET") return Response.json(paginate(SESSIONS, u.searchParams));
+        if (req.method === "POST") {
+          const b = (body ?? {}) as Record<string, unknown>;
+          return Response.json({
+            ...SESSION_1,
+            session_id: "sess-new",
+            title: typeof b.title === "string" ? b.title : "New session",
+            tags: Array.isArray(b.tags) ? b.tags : [],
+            url: "https://app.devin.ai/sessions/sess-new",
+          });
+        }
+      }
+
+      const sessSub = /^\/v3\/organizations\/[^/]+\/sessions\/([^/]+)(\/[a-z]+)?$/.exec(u.pathname);
+      if (sessSub) {
+        const [, id, sub] = sessSub;
+        const s = findSession(id ?? "");
+        if (!s) return Response.json(PROBLEM(404, "session not found"), { status: 404 });
+        if (sub === "/messages" && req.method === "GET")
+          return Response.json(paginate(SESSION_MESSAGES, u.searchParams));
+        if (sub === "/insights" && req.method === "GET")
+          return Response.json(
+            SESSION_INSIGHTS_LIST.find((i) => i.session_id === s.session_id) ?? SESSION_INSIGHTS,
+          );
+        if (sub === "/attachments" && req.method === "GET")
+          return Response.json(SESSION_ATTACHMENTS);
+        if (sub === "/archive" && req.method === "POST")
+          return Response.json({ ...s, is_archived: true });
+        if (sub === "/tags") {
+          if (req.method === "GET") return Response.json({ tags: SESSION_TAGS });
+          const tags = Array.isArray((body as { tags?: unknown })?.tags)
+            ? ((body as { tags: unknown[] }).tags as string[])
+            : [];
+          if (req.method === "POST") {
+            const merged = [...new Set([...SESSION_TAGS, ...tags])];
+            return Response.json({ tags: merged });
+          }
+          if (req.method === "PUT") return Response.json({ tags });
+        }
+        if (sub === undefined) {
+          if (req.method === "GET") return Response.json(s);
+          if (req.method === "DELETE")
+            return Response.json({ ...s, status: "exit", status_detail: "finished" });
         }
       }
 

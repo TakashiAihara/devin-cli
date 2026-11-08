@@ -23,6 +23,7 @@ bun run start -- self
 bun run start -- billing --days 30
 bun run start -- consumption daily --days 7
 bun run start -- metrics usage --days 30
+bun run start -- sessions list --limit 20
 ```
 
 グローバルに使いたい場合は `bun link` するか `bun build --compile` でバイナリを作る（リリースバイナリ配布は今後対応）。
@@ -45,6 +46,15 @@ echo 'source ~/.devin-cli-completion.bash' >> ~/.bashrc
 | `consumption service-user <id> [--days N]` | service user の日次消費 |
 | `consumption session <id> [--days N]` | session の日次消費 |
 | `metrics <name> [--days N]` | `usage` / `sessions` / `prs` / `searches` / `dau` / `wau` / `mau` / `active-users` |
+| `sessions list [--limit N]` | セッション一覧（cursor ページネーション。`--status`/`--tag`/`--origin`/`--archived` 等で絞れる） |
+| `sessions get <id>` | セッション詳細 |
+| `sessions messages <id> [--limit N]` | セッションのメッセージ一覧 |
+| `sessions insights [id]` | insights。ID 省略時は組織全体の一覧 |
+| `sessions attachments <id>` | セッションの添付一覧 |
+| `sessions create --prompt <text>` | セッション作成（**実費が発生する**。`--prompt -` で stdin から読む） |
+| `sessions archive <id>` | セッションを archive |
+| `sessions tags get/add/set <id> [tags...]` | タグの一覧・追加・全置換 |
+| `sessions delete <id> --yes` | セッション終了（破壊的。`--yes` 必須、無いと dry-run で exit 2） |
 | `completion <shell>` | bash / zsh / fish 向けの補完スクリプトを stdout に出す |
 
 `--org <id>` で org を明示できる。省略時は `--org` > `DEVIN_ORG_ID` > config `org_id` > `GET /v3/self` の順で解決する。
@@ -83,8 +93,11 @@ api_key_command = "op read op://Private/devin-api-key/credential"  # 1Password C
 
 - consumption 系: `ViewOrgConsumption`
 - metrics 系: `ViewOrgMetrics`
+- sessions 系: セッションの read / write 権限（一覧・詳細・messages・insights・attachments の read と、create / archive / tags / delete の write）
 
-PAT / service user に権限を付けて発行する。Pro plan (self-serve) では org scope の consumption / metrics ともに動作確認済み。`--days` の上限は 100（consumption / metrics とも。CLI 側でも検査する）。
+PAT / service user に権限を付けて発行する。Pro plan (self-serve) では org scope の consumption / metrics / sessions ともに動作確認済み。`--days` の上限は 100（consumption / metrics とも。CLI 側でも検査する）。
+
+**`sessions create` は実費（ACU）が発生する操作**。`--max-acu` で上限を付けられる。**`sessions delete` はセッションを終了する破壊的操作**で、`--yes` を付けない限り dry-run（対象の表示のみ）で exit 2 になる。
 
 **enterprise scope (`/v3/enterprise/*`, `/v3beta1/enterprise/*`) は対象外**。これらのエンドポイントは Enterprise plan 専用で、Pro/self-serve では全て 403 を返す（実測済み）。そのため org 管理・members/service-users 管理・git-providers・audit-logs 等の enterprise 系コマンドは実装していない。Enterprise plan を使う場合は別途対応が必要（issue #32 参照）。
 
