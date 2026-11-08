@@ -20,6 +20,17 @@ describe("config.toml", () => {
     expect(r.code).toBe(0);
   });
 
+  test("api_key_command の解決はプロセス内で 1 回だけ (API 呼び出しが複数あっても)", async () => {
+    // user_id 省略の consumption user は /v3/self (org 解決) と consumption の 2 リクエストを投げる。
+    // secret() はリクエストごとに呼ばれるが、api_key_command は 1 回しか走らないはず
+    const countFile = join(ctx.sb.dir, "key-runs");
+    writeConfig(ctx.sb, `api_key_command = "echo run >> ${countFile}; echo ${API_KEY}"\n`);
+    const r = await ctx.run(["consumption", "user"], { DEVIN_API_KEY: undefined });
+    expect(r.code).toBe(0);
+    expect(ctx.fake.log).toHaveLength(2);
+    expect(readFileSync(countFile, "utf8").trim().split("\n")).toHaveLength(1);
+  });
+
   test("api_key_command が失敗したら exit 2", async () => {
     writeConfig(ctx.sb, 'api_key_command = "exit 1"\n');
     const r = await ctx.run(["self"], { DEVIN_API_KEY: undefined });

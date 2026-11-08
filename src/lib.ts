@@ -214,12 +214,30 @@ async function runCommand(cmd: string, ms: number): Promise<Command> {
   }
 }
 
+// *_command で解決した秘密はプロセス内で使い回す。
+// secret() は API リクエストごとに呼ばれるので、ここでメモ化しないと
+// api_key_command のような 1 回 1 秒かかる経路がリクエスト数だけ走る。
+// Promise ごと覚えるので同時呼び出しも 1 回の実行にまとまる。
+// 失敗はキャッシュに残さず、次の呼び出しで再試行させる
+const commandSecrets = new Map<string, Promise<string>>();
+
 export async function secret(name: string): Promise<string> {
   const v = process.env[name];
   if (v) return v;
+  const cached = commandSecrets.get(name);
+  if (cached) return cached;
   const key = CMD_KEY[name];
   const cmd = key ? config()[key] : undefined;
-  if (!cmd) return die(`${name} が env に無く、設定の ${key ?? "*_command"} も無い`, 2);
+  if (!key || !cmd) return die(`${name} が env に無く、設定の ${key ?? "*_command"} も無い`, 2);
+  const p = commandSecret(name, key, cmd);
+  commandSecrets.set(name, p);
+  p.catch(() => {
+    if (commandSecrets.get(name) === p) commandSecrets.delete(name);
+  });
+  return p;
+}
+
+async function commandSecret(name: string, key: string, cmd: string): Promise<string> {
   const ms = commandTimeoutMs();
   const r = await runCommand(cmd, ms);
   if (r.timedOut) return die(`${name} を ${key} から取れない: ${ms / 1000} 秒で返らない`, 2);
