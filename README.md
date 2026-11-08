@@ -63,6 +63,12 @@ org_id = "org-..."
 api_base_url = "https://api.devin.ai"
 ```
 
+machine identity 経由の self-hosted Infisical なら `inf-run` で 1 本だけ取り出す形も使える:
+
+```toml
+api_key_command = "inf-run -- printenv DEVIN_API_PAT"
+```
+
 秘密の平文を書くキーは無い。env が `*_command` より優先される。
 
 ## 権限
@@ -70,7 +76,7 @@ api_base_url = "https://api.devin.ai"
 - consumption 系: `ViewOrgConsumption`
 - metrics 系: `ViewOrgMetrics`
 
-PAT / service user に権限を付けて発行する。Pro plan (self-serve) では org scope の consumption は使えるが、enterprise scope (`/v3/enterprise/*`) は 403 になる。また metrics の org endpoint はプラン対応が未確認のため、403 が出たら権限不足かプラン非対応かを `detail` で確認する。
+PAT / service user に権限を付けて発行する。Pro plan (self-serve) では org scope の consumption / metrics ともに動作確認済み。enterprise scope (`/v3/enterprise/*`) は 403 になる。consumption/daily の `time_after`〜`time_before` は 100 日まで（超えると API が 422 を返す）。
 
 ## 日付の扱い
 
