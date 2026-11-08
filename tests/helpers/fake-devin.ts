@@ -1,5 +1,6 @@
 // 偽の Devin API。/v3/self と org scope の consumption/metrics に canned JSON を返す。
-// 認証: /v3/* は Authorization: Bearer cog_... を検査する
+// 認証: /v3/* は Authorization: Bearer cog_... を検査する (/presigned/ は attachment の
+// リダイレクト先なので認証なしで返す — 本物の presigned URL も credential を持たない)
 export const API_KEY = "cog_test-key";
 
 export const SELF_PAT = {
@@ -73,6 +74,114 @@ export const METRICS_ACTIVE_USERS = [
   { start_time: 1767225600, end_time: 1767311999, active_users: 2 }, // 2026-01-01T00:00Z..23:59:59Z
   { start_time: 1767312000, end_time: 1767398399, active_users: 3 }, // 2026-01-02T00:00Z..23:59:59Z
 ];
+
+// --- members (v3beta1) ---
+// members/users は 2 ページに分かれる (after=cur-2 で 2 ページ目)。cursor 追跡と --limit を試せる
+export const MEMBER_USER_1 = {
+  user_id: "user-1",
+  email: "alice@example.com",
+  name: "Alice",
+  role_assignments: [
+    {
+      org_id: "org-x",
+      role: { role_id: "role-admin", role_name: "Admin", role_type: "org" },
+    },
+  ],
+};
+export const MEMBER_USER_2 = {
+  user_id: "user-2",
+  email: "bob@example.com",
+  name: "Bob",
+  role_assignments: [{ role: { role_id: "role-member", role_name: "Member", role_type: "org" } }],
+};
+export const MEMBER_DETAIL = {
+  ...MEMBER_USER_1,
+  idp_role_assignments: [
+    {
+      idp_group_name: "eng-admins",
+      org_id: "org-x",
+      role: { role_id: "role-admin", role_name: "Admin", role_type: "org" },
+    },
+  ],
+};
+export const IDP_USER = {
+  user_id: "user-9",
+  email: "carol@example.com",
+  name: "Carol",
+  idp_role_assignments: [
+    {
+      idp_group_name: "sso-admins",
+      role: { role_id: "role-admin", role_name: "Admin", role_type: "org" },
+    },
+  ],
+};
+
+// --- playbooks ---
+export const PLAYBOOK = {
+  playbook_id: "pb-1",
+  title: "My Playbook",
+  macro: "!my",
+  body: "Do the thing",
+  access_type: "org",
+  org_id: "org-x",
+  created_by: "user-1",
+  created_at: 1767225600,
+  updated_at: 1767312000,
+  structured_output_schema: null,
+};
+export const PLAYBOOK_2 = {
+  ...PLAYBOOK,
+  playbook_id: "pb-2",
+  title: "Second",
+  macro: null,
+  access_type: "enterprise",
+  org_id: null,
+};
+
+// --- pr-reviews ---
+export const PR_REVIEW = {
+  commit_sha: "abc123def456",
+  created_at: "2026-01-03T04:05:06Z",
+  pr_number: 42,
+  repo_path: "github.com/owner/repo",
+  status: "completed",
+};
+
+// --- attachments ---
+export const ATTACHMENT = {
+  attachment_id: "att-1",
+  name: "file.bin",
+  url: "https://files.example.com/att-1",
+};
+// 0xFF を含むバイト列。--out のバイト完全一致を検証するためのもの
+export const PRESIGNED_BYTES = new Uint8Array([0x50, 0x4b, 0x03, 0x04, 0xff, 0x00, 0x61]);
+
+// --- security-profiles (v3beta1) ---
+export const SECURITY_PROFILE = {
+  profile_id: "sp-1",
+  org_id: "org-x",
+  name: "Baseline",
+  enforcement_level: "recommended",
+  git_access_level: "read_only",
+  devin_mcp_read_only: false,
+  remove_github_cli_token: true,
+  mcp_config: { servers: ["github"] },
+  net_policy: { allow: [{ hostname: "*.github.com" }] },
+  slack_dm_scope: null,
+  teams_dm_scope: null,
+  teams_group_chat_scope: null,
+  created_at: 1767225600,
+  updated_at: 1767312000,
+};
+export const SECURITY_PROFILE_SETTINGS = {
+  default: { selection: "profile", profile_id: "sp-1", profile_scope: "org" },
+  automations_default: { selection: "inherit" },
+};
+export const DEFAULT_PLATFORM = {
+  platform: "linux",
+  outpost_pool_id: null,
+  outpost_pool_name: null,
+};
 
 // ---- knowledge notes ----
 
@@ -481,6 +590,8 @@ export type FakeOptions = {
 
 export type Fake = { url: string; log: Logged[]; stop: () => void };
 
+const notFound = () => Response.json(PROBLEM(404, "not found"), { status: 404 });
+
 const intParam = (v: string | null, dflt: number) => {
   const n = v === null ? NaN : Number(v);
   return Number.isFinite(n) ? n : dflt;
@@ -544,6 +655,12 @@ export function startFake(options: FakeOptions = {}): Fake {
           headers: { "Content-Type": "text/html" },
         });
       if (options.hang?.includes(u.pathname)) await new Promise(() => {});
+
+      // attachment download の 2 段目 (presigned)。本物同様 credential 無しで返す
+      if (u.pathname.startsWith("/presigned/") && req.method === "GET")
+        return new Response(PRESIGNED_BYTES, {
+          headers: { "Content-Type": "application/octet-stream" },
+        });
 
       if (auth !== `Bearer ${API_KEY}`)
         return Response.json(PROBLEM(401, "invalid or missing token"), { status: 401 });
@@ -671,6 +788,160 @@ export function startFake(options: FakeOptions = {}): Fake {
           case "active-users":
             return Response.json(METRICS_ACTIVE_USERS[0]);
         }
+      }
+
+      // --- members (v3beta1) ---
+      const memberUserMatch = /^\/v3beta1\/organizations\/[^/]+\/members\/users\/([^/]+)$/.exec(
+        u.pathname,
+      );
+      if (memberUserMatch && req.method === "GET") {
+        if (memberUserMatch[1] === "missing") return notFound();
+        return Response.json(MEMBER_DETAIL);
+      }
+      if (/^\/v3beta1\/organizations\/[^/]+\/members\/users$/.test(u.pathname)) {
+        if (req.method !== "GET") return notFound();
+        // cursor pagination: after 無しが 1 ページ目、after=cur-2 が 2 ページ目
+        if (u.searchParams.get("after") === "cur-2")
+          return Response.json({
+            items: [MEMBER_USER_2],
+            end_cursor: null,
+            has_next_page: false,
+            total: 2,
+          });
+        return Response.json({
+          items: [MEMBER_USER_1],
+          end_cursor: "cur-2",
+          has_next_page: true,
+          total: 2,
+        });
+      }
+      if (/^\/v3beta1\/organizations\/[^/]+\/members\/idp-users$/.test(u.pathname)) {
+        if (req.method !== "GET") return notFound();
+        return Response.json({ items: [IDP_USER], has_next_page: false, total: 1 });
+      }
+
+      // --- playbooks ---
+      const playbookMatch = /^\/v3\/organizations\/[^/]+\/playbooks\/([^/]+)$/.exec(u.pathname);
+      if (playbookMatch) {
+        const id = playbookMatch[1];
+        if (id === "missing") return notFound();
+        if (req.method === "GET") return Response.json(PLAYBOOK);
+        if (req.method === "PUT")
+          return Response.json({ ...PLAYBOOK, ...(body as Record<string, unknown>) });
+        if (req.method === "DELETE") return Response.json(PLAYBOOK);
+        return notFound();
+      }
+      if (/^\/v3\/organizations\/[^/]+\/playbooks$/.test(u.pathname)) {
+        if (req.method === "GET")
+          return Response.json({ items: [PLAYBOOK, PLAYBOOK_2], has_next_page: false, total: 2 });
+        if (req.method === "POST") {
+          const reqBody = (body ?? {}) as Record<string, unknown>;
+          return Response.json({
+            ...PLAYBOOK,
+            ...reqBody,
+            playbook_id: "pb-new",
+            created_at: 1767400000,
+            updated_at: 1767400000,
+          });
+        }
+        return notFound();
+      }
+
+      // --- pr-reviews (GET は pr_url 必須。一覧 API ではない) ---
+      if (/^\/v3\/organizations\/[^/]+\/pr-reviews$/.test(u.pathname)) {
+        if (req.method === "GET") {
+          const prUrl = u.searchParams.get("pr_url");
+          if (!prUrl)
+            return Response.json(PROBLEM(422, "query.pr_url: Field required"), { status: 422 });
+          if (prUrl.includes("missing")) return notFound();
+          return Response.json(PR_REVIEW);
+        }
+        if (req.method === "POST") {
+          // body は readBody で parse 済み。JSON object として届くことだけ確認する
+          if (typeof body !== "object" || body === null)
+            return Response.json(PROBLEM(400, "body must be a JSON object"), { status: 400 });
+          return Response.json({ ...PR_REVIEW, status: "pending" });
+        }
+        return notFound();
+      }
+
+      // --- attachments ---
+      if (/^\/v3\/organizations\/[^/]+\/attachments$/.test(u.pathname)) {
+        if (req.method !== "POST") return notFound();
+        // multipart body は JSON でないので readBody は生テキストを返す。
+        // そこから filename="..." を拾って name に載せる
+        const m = typeof body === "string" ? /filename="([^"]+)"/.exec(body) : null;
+        return Response.json({ ...ATTACHMENT, name: m?.[1] ?? ATTACHMENT.name });
+      }
+      const attachmentMatch = /^\/v3\/organizations\/[^/]+\/attachments\/([^/]+)\/([^/]+)$/.exec(
+        u.pathname,
+      );
+      if (attachmentMatch && req.method === "GET") {
+        if (attachmentMatch[1] === "missing") return notFound();
+        // 実 API 同様 307 で presigned URL にリダイレクトする
+        return new Response(null, {
+          status: 307,
+          headers: {
+            location: `${u.origin}/presigned/${attachmentMatch[1]}/${attachmentMatch[2]}`,
+          },
+        });
+      }
+
+      // --- security-profiles (v3beta1) ---
+      const profileMatch = /^\/v3beta1\/organizations\/[^/]+\/security-profiles\/([^/]+)$/.exec(
+        u.pathname,
+      );
+      if (profileMatch) {
+        const id = profileMatch[1];
+        if (id === "missing") return notFound();
+        if (req.method === "GET") return Response.json(SECURITY_PROFILE);
+        if (req.method === "PATCH")
+          return Response.json({ ...SECURITY_PROFILE, ...(body as Record<string, unknown>) });
+        if (req.method === "DELETE") return new Response(null, { status: 204 });
+        return notFound();
+      }
+      if (/^\/v3beta1\/organizations\/[^/]+\/security-profiles$/.test(u.pathname)) {
+        if (req.method === "GET")
+          return Response.json({
+            items: [SECURITY_PROFILE],
+            has_next_page: false,
+            total: 1,
+          });
+        if (req.method === "POST") {
+          const reqBody = (body ?? {}) as Record<string, unknown>;
+          return Response.json({
+            ...SECURITY_PROFILE,
+            ...reqBody,
+            profile_id: "sp-new",
+          });
+        }
+        return notFound();
+      }
+      if (/^\/v3beta1\/organizations\/[^/]+\/security-profile-settings$/.test(u.pathname)) {
+        if (req.method === "GET") return Response.json(SECURITY_PROFILE_SETTINGS);
+        if (req.method === "PATCH") {
+          const reqBody = (body ?? {}) as Record<string, unknown>;
+          return Response.json({
+            ...SECURITY_PROFILE_SETTINGS,
+            ...(reqBody.default !== undefined ? { default: reqBody.default } : {}),
+            ...(reqBody.automations_default !== undefined
+              ? { automations_default: reqBody.automations_default }
+              : {}),
+          });
+        }
+        return notFound();
+      }
+      if (/^\/v3beta1\/organizations\/[^/]+\/default-platform$/.test(u.pathname)) {
+        if (req.method === "GET") return Response.json(DEFAULT_PLATFORM);
+        if (req.method === "PUT") {
+          const reqBody = (body ?? {}) as Record<string, unknown>;
+          return Response.json({
+            platform: (reqBody.platform as string | null | undefined) ?? null,
+            outpost_pool_id: (reqBody.outpost_pool_id as string | null | undefined) ?? null,
+            outpost_pool_name: null,
+          });
+        }
+        return notFound();
       }
 
       // ---- sessions (org scope) ----

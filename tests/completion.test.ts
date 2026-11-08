@@ -19,6 +19,13 @@ const TOP_COMMANDS = [
   "notes",
   "automations",
   "schedules",
+  "members",
+  "playbooks",
+  "pr-reviews",
+  "attachments",
+  "security-profiles",
+  "security-profile-settings",
+  "default-platform",
   "completion",
 ];
 const CONSUMPTION_SUBCOMMANDS = ["daily", "user", "service-user", "session"];
@@ -35,12 +42,25 @@ const SESSIONS_SUBCOMMANDS = [
   "delete",
 ];
 const NEW_WORDS = ["folders", "list", "get", "create", "update", "delete", "schemas", "templates"];
+// org-resources 系だけが持つサブコマンド名
+const ORG_WORDS = ["idp-users", "upload", "download", "set"];
 const ALL_WORDS = [
   ...TOP_COMMANDS,
   ...CONSUMPTION_SUBCOMMANDS,
   ...METRIC_NAMES,
   ...SESSIONS_SUBCOMMANDS,
   ...NEW_WORDS,
+  ...ORG_WORDS,
+];
+// org-resources 系だけが持つオプション
+const ORG_OPTS = [
+  "--commit-sha",
+  "--out",
+  "--macro",
+  "--include-enterprise",
+  "--enforcement-level",
+  "--outpost-pool-id",
+  "--clear",
 ];
 
 describe("completion", () => {
@@ -60,6 +80,7 @@ describe("completion", () => {
       "--body-json",
       "--prompt",
       "--yes",
+      ...ORG_OPTS,
     ])
       expect(r.out).toContain(o);
   });
@@ -80,6 +101,7 @@ describe("completion", () => {
       "--body-json",
       "--prompt",
       "--yes",
+      ...ORG_OPTS,
     ])
       expect(r.out).toContain(o);
   });
@@ -100,6 +122,13 @@ describe("completion", () => {
       "-l body-json",
       "-l prompt",
       "-l yes",
+      "-l commit-sha",
+      "-l out",
+      "-l macro",
+      "-l include-enterprise",
+      "-l enforcement-level",
+      "-l outpost-pool-id",
+      "-l clear",
     ])
       expect(r.out).toContain(o);
   });
