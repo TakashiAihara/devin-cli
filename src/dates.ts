@@ -41,7 +41,7 @@ export function formatDateUtc(unixSec: number): string {
   return new Date(unixSec * 1000).toISOString().slice(0, 10);
 }
 
-// Unix 秒を UTC の ISO 8601 にする (created_at 等の時刻表示用)
+// Unix 秒を ISO 8601 (UTC) にする。created_at / notes / automations の *_at タイムスタンプ用
 export function formatIsoUtc(unixSec: number): string {
   return new Date(unixSec * 1000).toISOString();
 }

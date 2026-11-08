@@ -33,7 +33,7 @@ describe("default-platform", () => {
       (l) => l.path === "/v3beta1/organizations/org-x/default-platform",
     );
     expect(call?.method).toBe("PUT");
-    expect(JSON.parse(call?.body ?? "{}")).toEqual({ platform: "windows" });
+    expect(call?.body).toEqual({ platform: "windows" });
   });
 
   test("set --outpost-pool-id は {outpost_pool_id} を PUT する", async () => {
@@ -50,7 +50,7 @@ describe("default-platform", () => {
     const call = ctx.fake.log.find(
       (l) => l.path === "/v3beta1/organizations/org-x/default-platform",
     );
-    expect(JSON.parse(call?.body ?? "{}")).toEqual({ outpost_pool_id: "pool-1" });
+    expect(call?.body).toEqual({ outpost_pool_id: "pool-1" });
   });
 
   test("set --clear は空 object を PUT して解除になる", async () => {
@@ -60,7 +60,7 @@ describe("default-platform", () => {
     const call = ctx.fake.log.find(
       (l) => l.path === "/v3beta1/organizations/org-x/default-platform",
     );
-    expect(JSON.parse(call?.body ?? "{}")).toEqual({});
+    expect(call?.body).toEqual({});
   });
 
   test("set はフラグ無し・併用で exit 2", async () => {

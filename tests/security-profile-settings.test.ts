@@ -37,7 +37,7 @@ describe("security-profile-settings", () => {
       (l) => l.path === "/v3beta1/organizations/org-x/security-profile-settings",
     );
     expect(call?.method).toBe("PATCH");
-    expect(JSON.parse(call?.body ?? "{}")).toEqual({ default: { selection: "none" } });
+    expect(call?.body).toEqual({ default: { selection: "none" } });
     // fake は PATCH body の default をそのまま返す
     expect(r.out).toContain("default\tnone\t-\t-");
   });
@@ -59,7 +59,7 @@ describe("security-profile-settings", () => {
     const call = ctx.fake.log.find(
       (l) => l.path === "/v3beta1/organizations/org-x/security-profile-settings",
     );
-    expect(JSON.parse(call?.body ?? "{}")).toEqual({
+    expect(call?.body).toEqual({
       default: { selection: "profile", profile_id: "sp-2" },
       automations_default: { selection: "inherit" },
     });

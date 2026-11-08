@@ -59,6 +59,6 @@ describe("pr-reviews", () => {
     expect(r.out).toBe(tsv(HEADER, ROW.replace("completed", "pending")));
     const call = ctx.fake.log.find((l) => l.path === "/v3/organizations/org-x/pr-reviews");
     expect(call?.method).toBe("POST");
-    expect(JSON.parse(call?.body ?? "{}")).toEqual({ pr_url: PR_URL });
+    expect(call?.body).toEqual({ pr_url: PR_URL });
   });
 });

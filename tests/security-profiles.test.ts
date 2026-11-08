@@ -68,7 +68,7 @@ describe("security-profiles", () => {
       (l) => l.path === "/v3beta1/organizations/org-x/security-profiles",
     );
     expect(call?.method).toBe("POST");
-    expect(JSON.parse(call?.body ?? "{}")).toEqual({
+    expect(call?.body).toEqual({
       name: "NewProfile",
       enforcement_level: "mandatory",
       git_access_level: "read_write",
@@ -121,7 +121,7 @@ describe("security-profiles", () => {
     );
     expect(call?.method).toBe("PATCH");
     // PATCH: 指定した 3 項目だけが body に入る (name 等は送らない)
-    expect(JSON.parse(call?.body ?? "{}")).toEqual({
+    expect(call?.body).toEqual({
       enforcement_level: "mandatory",
       mcp_config: null,
       slack_dm_scope: null,

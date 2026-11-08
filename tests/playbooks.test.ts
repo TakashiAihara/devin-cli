@@ -59,7 +59,7 @@ describe("playbooks", () => {
     expect(r.out).toContain("pb-new");
     const call = ctx.fake.log.find((l) => l.path === "/v3/organizations/org-x/playbooks");
     expect(call?.method).toBe("POST");
-    expect(JSON.parse(call?.body ?? "{}")).toEqual({
+    expect(call?.body).toEqual({
       title: "New PB",
       body: "Body text",
       macro: "!new",
@@ -82,7 +82,7 @@ describe("playbooks", () => {
     ]);
     expect(r.code).toBe(0);
     const call = ctx.fake.log.find((l) => l.path === "/v3/organizations/org-x/playbooks");
-    const sent = JSON.parse(call?.body ?? "{}") as Record<string, unknown>;
+    const sent = call?.body as Record<string, unknown>;
     expect(sent.body).toBe("file body\n");
     expect(sent.structured_output_schema).toEqual({ type: "object" });
   });
@@ -140,7 +140,7 @@ describe("playbooks", () => {
     expect(r.code).toBe(0);
     const call = ctx.fake.log.find((l) => l.path === "/v3/organizations/org-x/playbooks/pb-1");
     expect(call?.method).toBe("PUT");
-    expect(JSON.parse(call?.body ?? "{}")).toEqual({
+    expect(call?.body).toEqual({
       title: "Renamed",
       body: "New body",
     });

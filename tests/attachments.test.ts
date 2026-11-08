@@ -16,8 +16,9 @@ describe("attachments", () => {
     );
     const call = ctx.fake.log.find((l) => l.path === "/v3/organizations/org-x/attachments");
     expect(call?.method).toBe("POST");
-    expect(call?.body).toContain('filename="hello.txt"');
-    expect(call?.body).toContain("hello world");
+    // multipart は JSON でないので fake は生テキストを body に記録する
+    expect(call?.body as string).toContain('filename="hello.txt"');
+    expect(call?.body as string).toContain("hello world");
   });
 
   test("upload --json は生 JSON", async () => {

@@ -286,3 +286,13 @@ export const cell = (v: unknown) => (v === null || v === undefined ? "-" : Strin
 export const cellText = (v: unknown) => oneLine(cell(v));
 export const print = (s: string) => process.stdout.write(`${s}\n`);
 export const json = (v: unknown) => print(JSON.stringify(v));
+
+// --enabled / --disabled のような対のフラグを true / false / undefined に畳む。
+// 両方立っていたら使い方の誤りとして exit 2
+export function enabledDisabled(o: { enabled?: boolean; disabled?: boolean }): boolean | undefined {
+  if (o.enabled === true && o.disabled === true)
+    return die("--enabled と --disabled は同時に指定できない", 2);
+  if (o.enabled === true) return true;
+  if (o.disabled === true) return false;
+  return undefined;
+}
