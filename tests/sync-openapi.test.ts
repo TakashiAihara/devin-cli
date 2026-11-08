@@ -62,7 +62,7 @@ describe("mergeFragments", () => {
       components: { schemas: {}, securitySchemes: {} },
     });
     const m = mergeFragments([base, post]);
-    expect(Object.keys(m.paths["/v3/a"] ?? {}).sort()).toEqual(["get", "post"]);
+    expect(Object.keys(m.paths["/v3/a"] ?? {}).toSorted()).toEqual(["get", "post"]);
   });
 
   test("同じ path・method で内容が違えば失敗", () => {
