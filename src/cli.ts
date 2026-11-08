@@ -9,6 +9,16 @@ import {
   runConsumptionUser,
 } from "./commands/consumption.ts";
 import { METRICS, runMetrics, type MetricsName } from "./commands/metrics.ts";
+import {
+  runIndexingBranchDelete,
+  runIndexingDelete,
+  runIndexingList,
+  runIndexingRepoDelete,
+  runIndexingRepoGet,
+  runIndexingRepoSet,
+  runIndexingSet,
+  runRepositoriesList,
+} from "./commands/repositories.ts";
 import { runSelf } from "./commands/self.ts";
 import { VERSION } from "./version.ts";
 
@@ -48,6 +58,13 @@ const days = (value: string): number => {
   return n;
 };
 
+// ページネーションの --limit。上限は設けず 1 以上の整数のみ検査する
+const limit = (value: string): number => {
+  const n = Number(value);
+  if (!Number.isSafeInteger(n) || n < 1) throw new InvalidArgumentError("1 以上の整数を指定する");
+  return n;
+};
+
 const daysOption = () =>
   new Option(
     "--days <n>",
@@ -56,6 +73,15 @@ const daysOption = () =>
     .argParser(days)
     .default(30);
 const orgOption = () => new Option("--org <id>", "org ID (省略時は自動解決)");
+const jsonOption = () => new Option(JSON_FLAG, JSON_HELP);
+const limitOption = () =>
+  new Option("--limit <n>", "取得する最大件数 (省略時は全ページ)").argParser(limit);
+const filterOption = () => new Option("--filter <name>", "名前の部分一致フィルタ");
+// 繰り返し指定できるオプション。argParser の previous に default の [] が渡るので連結する
+const branchOption = () =>
+  new Option("--branch <name>", "indexing 対象ブランチ (繰り返し指定可)")
+    .argParser((value: string, prev: string[]) => [...prev, value])
+    .default([]);
 
 program
   .command("self")
@@ -157,6 +183,135 @@ program
   .action(async (name: MetricsName, opts: { days: number; org?: string; json?: boolean }) => {
     process.exit(
       await runMetrics({ name, days: opts.days, org: opts.org, json: opts.json === true }),
+    );
+  });
+
+const repositories = program
+  .command("repositories")
+  .description("組織のリポジトリと indexing 設定 (org scope)");
+
+repositories
+  .command("list")
+  .description("組織が使えるリポジトリ一覧 (GET /repositories)")
+  .addOption(limitOption())
+  .addOption(filterOption())
+  .addOption(orgOption())
+  .addOption(jsonOption())
+  .action(async (opts: { limit?: number; filter?: string; org?: string; json?: boolean }) => {
+    process.exit(
+      await runRepositoriesList({
+        limit: opts.limit,
+        filter: opts.filter,
+        org: opts.org,
+        json: opts.json === true,
+      }),
+    );
+  });
+
+const indexing = repositories
+  .command("indexing")
+  .description("indexing の一括設定 (GET/PUT/DELETE /repositories/indexing)");
+
+indexing
+  .command("list")
+  .description("indexing 済みリポジトリ一覧")
+  .addOption(limitOption())
+  .addOption(filterOption())
+  .addOption(orgOption())
+  .addOption(jsonOption())
+  .action(async (opts: { limit?: number; filter?: string; org?: string; json?: boolean }) => {
+    process.exit(
+      await runIndexingList({
+        limit: opts.limit,
+        filter: opts.filter,
+        org: opts.org,
+        json: opts.json === true,
+      }),
+    );
+  });
+
+indexing
+  .command("set")
+  .description("リポジトリを一括で indexing 対象にする (indexing job が走る)")
+  .argument("<paths...>", "repository_path (例: org/repo)")
+  .addOption(branchOption())
+  .addOption(orgOption())
+  .addOption(jsonOption())
+  .action(async (paths: string[], opts: { branch: string[]; org?: string; json?: boolean }) => {
+    process.exit(
+      await runIndexingSet({
+        paths,
+        branches: opts.branch,
+        org: opts.org,
+        json: opts.json === true,
+      }),
+    );
+  });
+
+indexing
+  .command("delete")
+  .description("リポジトリを一括で indexing 対象から外す")
+  .argument("<paths...>", "repository_path (例: org/repo)")
+  .addOption(orgOption())
+  .addOption(jsonOption())
+  .action(async (paths: string[], opts: { org?: string; json?: boolean }) => {
+    process.exit(await runIndexingDelete({ paths, org: opts.org, json: opts.json === true }));
+  });
+
+const indexingRepo = repositories
+  .command("indexing-repo")
+  .description("リポジトリ別の indexing 設定 (GET/PUT/DELETE /repositories/{path}/indexing)");
+
+indexingRepo
+  .command("get")
+  .description("リポジトリの indexing 状態を取得")
+  .argument("<path>", "repository_path (例: org/repo)")
+  .addOption(orgOption())
+  .addOption(jsonOption())
+  .action(async (path: string, opts: { org?: string; json?: boolean }) => {
+    process.exit(await runIndexingRepoGet({ path, org: opts.org, json: opts.json === true }));
+  });
+
+indexingRepo
+  .command("set")
+  .description("リポジトリを indexing 対象にする (indexing job が走る)")
+  .argument("<path>", "repository_path (例: org/repo)")
+  .addOption(branchOption())
+  .addOption(orgOption())
+  .addOption(jsonOption())
+  .action(async (path: string, opts: { branch: string[]; org?: string; json?: boolean }) => {
+    process.exit(
+      await runIndexingRepoSet({
+        path,
+        branches: opts.branch,
+        org: opts.org,
+        json: opts.json === true,
+      }),
+    );
+  });
+
+indexingRepo
+  .command("delete")
+  .description("リポジトリを indexing 対象から外す")
+  .argument("<path>", "repository_path (例: org/repo)")
+  .addOption(orgOption())
+  .addOption(jsonOption())
+  .action(async (path: string, opts: { org?: string; json?: boolean }) => {
+    process.exit(await runIndexingRepoDelete({ path, org: opts.org, json: opts.json === true }));
+  });
+
+repositories
+  .command("indexing-branch")
+  .description("ブランチ別の indexing 設定")
+  .command("delete")
+  .description("ブランチを indexing 対象から外す (DELETE .../indexing/branches/{branch})")
+  .argument("<path>", "repository_path (例: org/repo)")
+  .argument("<branch>", "ブランチ名")
+  .addOption(orgOption())
+  .addOption(jsonOption())
+  .action(async (path: string, branch: string, opts: { org?: string; json?: boolean }) => {
+    process.exit(
+      await runIndexingBranchDelete({ path, branch, org: opts.org, json: opts.json === true }),
     );
   });
 

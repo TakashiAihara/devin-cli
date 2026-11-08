@@ -40,3 +40,8 @@ export function formatDateUtc8(unixSec: number): string {
 export function formatDateUtc(unixSec: number): string {
   return new Date(unixSec * 1000).toISOString().slice(0, 10);
 }
+
+// Unix 秒を UTC の ISO 8601 にする (repositories / snapshot 等の時刻フィールド用)
+export function formatTimestamp(unixSec: number): string {
+  return new Date(unixSec * 1000).toISOString();
+}

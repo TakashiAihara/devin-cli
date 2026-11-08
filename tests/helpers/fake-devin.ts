@@ -81,12 +81,122 @@ export const PROBLEM = (status: number, detail: string) => ({
   detail,
 });
 
+// --- repositories (org scope) ---
+
+const REPO_INDEXING_STATUS_EMPTY = {
+  indexing_enabled: false,
+  latest_completed_search_index_job: null,
+  latest_completed_wiki_index_job: null,
+  latest_indexes: [],
+};
+
+export const REPO_ONE = {
+  git_connection_host: "github.com",
+  git_connection_id: "gc-1",
+  indexing_status: { ...REPO_INDEXING_STATUS_EMPTY, indexing_enabled: true },
+  last_updated_at: 1767225600,
+  provider_repository_id: "prov-1",
+  repo_description: "first repo",
+  repo_full_name: "acme/one",
+  repo_language: "TypeScript",
+  repo_name: "one",
+  repo_path: "acme/one",
+};
+
+export const REPO_TWO = {
+  git_connection_host: "github.com",
+  git_connection_id: "gc-1",
+  indexing_status: null,
+  last_updated_at: null,
+  provider_repository_id: "prov-2",
+  repo_description: null,
+  repo_full_name: "acme/two",
+  repo_language: null,
+  repo_name: "two",
+  repo_path: "acme/two",
+};
+
+// after=cur-2 で 2 ページ目を返す cursor pagination の fixture
+export const REPOSITORIES_PAGE1 = {
+  items: [REPO_ONE],
+  end_cursor: "cur-2",
+  has_next_page: true,
+  total: 2,
+};
+export const REPOSITORIES_PAGE2 = {
+  items: [REPO_TWO],
+  end_cursor: null,
+  has_next_page: false,
+  total: 2,
+};
+
+export const INDEXING_LIST = {
+  items: [
+    {
+      repository_path: "acme/one",
+      indexing_enabled: true,
+      indexing_status: null,
+      branches: ["main", "dev"],
+    },
+    {
+      repository_path: "acme/two",
+      indexing_enabled: false,
+      indexing_status: null,
+      branches: [],
+    },
+  ],
+  end_cursor: null,
+  has_next_page: false,
+  total: 2,
+};
+
+export const REPO_INDEXING_STATUS = {
+  indexing_enabled: true,
+  latest_completed_search_index_job: {
+    branch_name: "main",
+    commit: "abc123",
+    created_at: 1767225600,
+    job_id: "job-s1",
+    status: "completed",
+  },
+  latest_completed_wiki_index_job: null,
+  latest_indexes: [
+    {
+      branch_name: "main",
+      commit: "abc123",
+      created_at: 1767225600,
+      job_id: "job-1",
+      status: "completed",
+    },
+    {
+      branch_name: "dev",
+      commit: "def456",
+      created_at: 1767312000,
+      job_id: "job-2",
+      status: "in_progress",
+    },
+  ],
+};
+
+export const indexingResponse = (repository_path: string) => ({
+  repository_path,
+  indexing_enabled: true,
+  indexing_status: null,
+  branches: ["main"],
+});
+
 const PROXY_PAGE = `<!DOCTYPE html>
 <html><head><title>502 Bad Gateway</title></head>
 <body><center><h1>502 Bad Gateway</h1></center><hr><center>nginx</center></body></html>
 `;
 
-export type Logged = { method: string; path: string; query: URLSearchParams; auth: string | null };
+export type Logged = {
+  method: string;
+  path: string;
+  query: URLSearchParams;
+  auth: string | null;
+  body: string;
+};
 
 export type FakeOptions = {
   selfBody?: unknown;
@@ -106,7 +216,8 @@ export function startFake(options: FakeOptions = {}): Fake {
     async fetch(req) {
       const u = new URL(req.url);
       const auth = req.headers.get("authorization");
-      log.push({ method: req.method, path: u.pathname, query: u.searchParams, auth });
+      const body = await req.text();
+      log.push({ method: req.method, path: u.pathname, query: u.searchParams, auth, body });
 
       if (options.proxyStatus)
         return new Response(PROXY_PAGE, {
@@ -166,6 +277,32 @@ export function startFake(options: FakeOptions = {}): Fake {
             return Response.json(METRICS_ACTIVE_USERS[0]);
         }
       }
+
+      // repositories (org scope)。repository_path は encode 済みで届くので decode して fixture に合わせる
+      if (/^\/v3\/organizations\/[^/]+\/repositories$/.test(u.pathname) && req.method === "GET") {
+        const after = u.searchParams.get("after");
+        return Response.json(after === "cur-2" ? REPOSITORIES_PAGE2 : REPOSITORIES_PAGE1);
+      }
+      if (/^\/v3\/organizations\/[^/]+\/repositories\/indexing$/.test(u.pathname)) {
+        if (req.method === "GET") return Response.json(INDEXING_LIST);
+        if (req.method === "PUT" || req.method === "DELETE")
+          return Response.json(INDEXING_LIST.items);
+      }
+      const repoIndexing = /^\/v3\/organizations\/[^/]+\/repositories\/([^/]+)\/indexing$/.exec(
+        u.pathname,
+      );
+      if (repoIndexing) {
+        const repoPath = decodeURIComponent(repoIndexing[1] ?? "");
+        if (req.method === "GET") return Response.json(REPO_INDEXING_STATUS);
+        if (req.method === "PUT" || req.method === "DELETE")
+          return Response.json(indexingResponse(repoPath));
+      }
+      const repoBranch =
+        /^\/v3\/organizations\/[^/]+\/repositories\/([^/]+)\/indexing\/branches\/([^/]+)$/.exec(
+          u.pathname,
+        );
+      if (repoBranch && req.method === "DELETE")
+        return Response.json(indexingResponse(decodeURIComponent(repoBranch[1] ?? "")));
 
       return Response.json(PROBLEM(404, "no route"), { status: 404 });
     },
