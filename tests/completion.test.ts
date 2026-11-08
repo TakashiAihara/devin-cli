@@ -10,7 +10,17 @@ afterEach(() => {
   removeSandbox(sb);
 });
 
-const TOP_COMMANDS = ["self", "billing", "consumption", "metrics", "sessions", "completion"];
+const TOP_COMMANDS = [
+  "self",
+  "billing",
+  "consumption",
+  "metrics",
+  "sessions",
+  "notes",
+  "automations",
+  "schedules",
+  "completion",
+];
 const CONSUMPTION_SUBCOMMANDS = ["daily", "user", "service-user", "session"];
 const METRIC_NAMES = ["usage", "sessions", "prs", "searches", "dau", "wau", "mau", "active-users"];
 const SESSIONS_SUBCOMMANDS = [
@@ -24,6 +34,14 @@ const SESSIONS_SUBCOMMANDS = [
   "tags",
   "delete",
 ];
+const NEW_WORDS = ["folders", "list", "get", "create", "update", "delete", "schemas", "templates"];
+const ALL_WORDS = [
+  ...TOP_COMMANDS,
+  ...CONSUMPTION_SUBCOMMANDS,
+  ...METRIC_NAMES,
+  ...SESSIONS_SUBCOMMANDS,
+  ...NEW_WORDS,
+];
 
 describe("completion", () => {
   test("bash は complete -F のスクリプトを出す", async () => {
@@ -32,14 +50,17 @@ describe("completion", () => {
     expect(r.err).toBe("");
     expect(r.out).toContain("complete -F _devin_cli devin-cli");
     expect(r.out).toContain("compgen -W");
-    for (const w of [
-      ...TOP_COMMANDS,
-      ...CONSUMPTION_SUBCOMMANDS,
-      ...METRIC_NAMES,
-      ...SESSIONS_SUBCOMMANDS,
+    for (const w of ALL_WORDS) expect(r.out).toContain(w);
+    for (const o of [
+      "--days",
+      "--org",
+      "--json",
+      "--limit",
+      "--trigger",
+      "--body-json",
+      "--prompt",
+      "--yes",
     ])
-      expect(r.out).toContain(w);
-    for (const o of ["--days", "--org", "--json", "--limit", "--prompt", "--yes"])
       expect(r.out).toContain(o);
   });
 
@@ -49,14 +70,17 @@ describe("completion", () => {
     expect(r.err).toBe("");
     expect(r.out).toContain("#compdef devin-cli");
     expect(r.out).toContain("_describe");
-    for (const w of [
-      ...TOP_COMMANDS,
-      ...CONSUMPTION_SUBCOMMANDS,
-      ...METRIC_NAMES,
-      ...SESSIONS_SUBCOMMANDS,
+    for (const w of ALL_WORDS) expect(r.out).toContain(w);
+    for (const o of [
+      "--days",
+      "--org",
+      "--json",
+      "--limit",
+      "--trigger",
+      "--body-json",
+      "--prompt",
+      "--yes",
     ])
-      expect(r.out).toContain(w);
-    for (const o of ["--days", "--org", "--json", "--limit", "--prompt", "--yes"])
       expect(r.out).toContain(o);
   });
 
@@ -65,15 +89,18 @@ describe("completion", () => {
     expect(r.code).toBe(0);
     expect(r.err).toBe("");
     expect(r.out).toContain("complete -c devin-cli");
-    for (const w of [
-      ...TOP_COMMANDS,
-      ...CONSUMPTION_SUBCOMMANDS,
-      ...METRIC_NAMES,
-      ...SESSIONS_SUBCOMMANDS,
-    ])
-      expect(r.out).toContain(w);
+    for (const w of ALL_WORDS) expect(r.out).toContain(w);
     // fish は長いオプションを -l <名前> で書く
-    for (const o of ["-l days", "-l org", "-l json", "-l limit", "-l prompt", "-l yes"])
+    for (const o of [
+      "-l days",
+      "-l org",
+      "-l json",
+      "-l limit",
+      "-l trigger",
+      "-l body-json",
+      "-l prompt",
+      "-l yes",
+    ])
       expect(r.out).toContain(o);
   });
 
