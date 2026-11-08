@@ -448,6 +448,283 @@ export const PROBLEM = (status: number, detail: string) => ({
   detail,
 });
 
+// --- repositories (org scope) ---
+
+const REPO_INDEXING_STATUS_EMPTY = {
+  indexing_enabled: false,
+  latest_completed_search_index_job: null,
+  latest_completed_wiki_index_job: null,
+  latest_indexes: [],
+};
+
+export const REPO_ONE = {
+  git_connection_host: "github.com",
+  git_connection_id: "gc-1",
+  indexing_status: { ...REPO_INDEXING_STATUS_EMPTY, indexing_enabled: true },
+  last_updated_at: 1767225600,
+  provider_repository_id: "prov-1",
+  repo_description: "first repo",
+  repo_full_name: "acme/one",
+  repo_language: "TypeScript",
+  repo_name: "one",
+  repo_path: "acme/one",
+};
+
+export const REPO_TWO = {
+  git_connection_host: "github.com",
+  git_connection_id: "gc-1",
+  indexing_status: null,
+  last_updated_at: null,
+  provider_repository_id: "prov-2",
+  repo_description: null,
+  repo_full_name: "acme/two",
+  repo_language: null,
+  repo_name: "two",
+  repo_path: "acme/two",
+};
+
+// after=cur-2 で 2 ページ目を返す cursor pagination の fixture
+export const REPOSITORIES_PAGE1 = {
+  items: [REPO_ONE],
+  end_cursor: "cur-2",
+  has_next_page: true,
+  total: 2,
+};
+export const REPOSITORIES_PAGE2 = {
+  items: [REPO_TWO],
+  end_cursor: null,
+  has_next_page: false,
+  total: 2,
+};
+
+export const INDEXING_LIST = {
+  items: [
+    {
+      repository_path: "acme/one",
+      indexing_enabled: true,
+      indexing_status: null,
+      branches: ["main", "dev"],
+    },
+    {
+      repository_path: "acme/two",
+      indexing_enabled: false,
+      indexing_status: null,
+      branches: [],
+    },
+  ],
+  end_cursor: null,
+  has_next_page: false,
+  total: 2,
+};
+
+export const REPO_INDEXING_STATUS = {
+  indexing_enabled: true,
+  latest_completed_search_index_job: {
+    branch_name: "main",
+    commit: "abc123",
+    created_at: 1767225600,
+    job_id: "job-s1",
+    status: "completed",
+  },
+  latest_completed_wiki_index_job: null,
+  latest_indexes: [
+    {
+      branch_name: "main",
+      commit: "abc123",
+      created_at: 1767225600,
+      job_id: "job-1",
+      status: "completed",
+    },
+    {
+      branch_name: "dev",
+      commit: "def456",
+      created_at: 1767312000,
+      job_id: "job-2",
+      status: "in_progress",
+    },
+  ],
+};
+
+export const indexingResponse = (repository_path: string) => ({
+  repository_path,
+  indexing_enabled: true,
+  indexing_status: null,
+  branches: ["main"],
+});
+
+// --- code-scans (org scope、read のみ) ---
+
+export const CODE_SCAN_FINDING = {
+  category: "sql-injection",
+  code_owners: ["team-backend"],
+  code_scan_run_id: "run-1",
+  created_at: 1767225600,
+  description: "user input reaches query builder",
+  finding_id: "finding-1",
+  note: null,
+  orchestrator_session_id: "sess-1",
+  payoff: "quick_win",
+  pr_url: null,
+  recommendation: "use parameterized queries",
+  reference_snippets: [],
+  repo_name: "acme/one",
+  scan_id: "scan-1",
+  session_id: null,
+  severity: "high",
+  status: "open",
+  title: "SQL injection in search",
+  updated_at: 1767312000,
+};
+
+export const CODE_SCAN_FINDINGS = {
+  items: [CODE_SCAN_FINDING],
+  end_cursor: null,
+  has_next_page: false,
+  total: 1,
+};
+
+export const CODE_SCAN_METRICS = {
+  avg_pr_open_duration_seconds: 3600,
+  avg_pr_time_to_merge_seconds: 7200,
+  open_critical_findings_count: 1,
+  open_high_findings_count: 2,
+  open_low_findings_count: 0,
+  open_medium_findings_count: 3,
+  prs_closed_count: 1,
+  prs_created_count: 4,
+  prs_merged_count: 2,
+  prs_open_count: 1,
+  repos_scanned_count: 2,
+  scans_count: 3,
+};
+
+export const CODE_SCAN = {
+  created_at: 1767225600,
+  effort: "normal",
+  host: "github.com",
+  org_id: "org-x",
+  profile: { profile_id: "prof-1", name: "security-baseline" },
+  repo_full_name: "acme/one",
+  repo_name: "acme/one",
+  scan_id: "scan-1",
+  scan_type: "security",
+  status: "completed",
+  url: "https://app.devin.ai/code-scan/scan-1",
+};
+
+export const CODE_SCAN_SCANS = {
+  items: [CODE_SCAN],
+  end_cursor: null,
+  has_next_page: false,
+  total: 1,
+};
+
+export const CODE_SCAN_PROFILE_SUMMARY = {
+  created_at: 1767225600,
+  description: "default security profile",
+  mode: "discover",
+  name: "security-baseline",
+  org_id: "org-x",
+  profile_id: "prof-1",
+  scan_type: "security",
+  visibility: "org",
+};
+
+export const CODE_SCAN_PROFILES = {
+  items: [CODE_SCAN_PROFILE_SUMMARY],
+  end_cursor: null,
+  has_next_page: false,
+  total: 1,
+};
+
+export const CODE_SCAN_PROFILE_DETAIL = {
+  ...CODE_SCAN_PROFILE_SUMMARY,
+  batch_size: null,
+  communication_guidance: null,
+  exclude_globs: null,
+  include_globs: ["src/**"],
+  ingestion_source_guidance: null,
+  investigation_guidance: "look for injection",
+  post_ingestion_guidance: null,
+  remediation_guidance: null,
+  report_guidance: null,
+  scan_paths: null,
+  threat_model_guidance: null,
+  triage_guidance: null,
+  type_config: null,
+  validation_guidance: null,
+  validation_severities: ["critical", "high"],
+};
+
+// --- snapshot-setup (org scope) ---
+
+export const SNAPSHOT_BLUEPRINT_ORG = {
+  blueprint_id: "bp-org-1",
+  build_on_default_branch_commit: null,
+  created_at: 1767225600,
+  repo_name: null,
+  report_check_runs: null,
+  source: null,
+  type: "org",
+  updated_at: 1767312000,
+};
+
+export const SNAPSHOT_BLUEPRINT_REPO = {
+  blueprint_id: "bp-repo-1",
+  build_on_default_branch_commit: true,
+  created_at: 1767225600,
+  repo_name: "acme/one",
+  report_check_runs: false,
+  source: "database",
+  type: "repo",
+  updated_at: 1767312000,
+};
+
+export const SNAPSHOT_BLUEPRINT_LIST = { data: [SNAPSHOT_BLUEPRINT_ORG, SNAPSHOT_BLUEPRINT_REPO] };
+
+export const SNAPSHOT_PRESIGNED = {
+  expires_at: 1767400000,
+  url: "https://files.example.com/presigned/blueprint.yaml",
+};
+
+export const SNAPSHOT_BLUEPRINT_FILE = {
+  blueprint_id: "bp-org-1",
+  created_at: 1767225600,
+  env_var_name: "NPM_TOKEN",
+  file_id: "bf-1",
+  name: "npm-token.txt",
+  size_bytes: 42,
+  updated_at: 1767312000,
+};
+
+export const SNAPSHOT_BLUEPRINT_FILE_LIST = { data: [SNAPSHOT_BLUEPRINT_FILE] };
+
+export const SNAPSHOT_BUILD = {
+  build_id: "build-1",
+  completed_at: 1767312000,
+  created_at: 1767225600,
+  pinned: true,
+  started_at: 1767225700,
+  status: "succeeded",
+  trigger: "manual",
+  triggered_by_user_id: "user-1",
+  updated_at: 1767312000,
+};
+
+// after=cur-2 で 2 ページ目を返す cursor pagination の fixture
+export const SNAPSHOT_BUILDS_PAGE1 = {
+  items: [SNAPSHOT_BUILD],
+  end_cursor: "cur-2",
+  has_next_page: true,
+  total: 2,
+};
+export const SNAPSHOT_BUILDS_PAGE2 = {
+  items: [{ ...SNAPSHOT_BUILD, build_id: "build-2", status: "running", pinned: false }],
+  end_cursor: null,
+  has_next_page: false,
+  total: 2,
+};
+
 // ---- sessions fixtures ----
 const SESSION_BASE = {
   acus_consumed: 1.25,
@@ -789,6 +1066,109 @@ export function startFake(options: FakeOptions = {}): Fake {
             return Response.json(METRICS_ACTIVE_USERS[0]);
         }
       }
+
+      // repositories (org scope)。repository_path は encode 済みで届くので decode して fixture に合わせる
+      if (/^\/v3\/organizations\/[^/]+\/repositories$/.test(u.pathname) && req.method === "GET") {
+        const after = u.searchParams.get("after");
+        return Response.json(after === "cur-2" ? REPOSITORIES_PAGE2 : REPOSITORIES_PAGE1);
+      }
+      if (/^\/v3\/organizations\/[^/]+\/repositories\/indexing$/.test(u.pathname)) {
+        if (req.method === "GET") return Response.json(INDEXING_LIST);
+        if (req.method === "PUT" || req.method === "DELETE")
+          return Response.json(INDEXING_LIST.items);
+      }
+      const repoIndexing = /^\/v3\/organizations\/[^/]+\/repositories\/([^/]+)\/indexing$/.exec(
+        u.pathname,
+      );
+      if (repoIndexing) {
+        const repoPath = decodeURIComponent(repoIndexing[1] ?? "");
+        if (req.method === "GET") return Response.json(REPO_INDEXING_STATUS);
+        if (req.method === "PUT" || req.method === "DELETE")
+          return Response.json(indexingResponse(repoPath));
+      }
+      const repoBranch =
+        /^\/v3\/organizations\/[^/]+\/repositories\/([^/]+)\/indexing\/branches\/([^/]+)$/.exec(
+          u.pathname,
+        );
+      if (repoBranch && req.method === "DELETE")
+        return Response.json(indexingResponse(decodeURIComponent(repoBranch[1] ?? "")));
+
+      // code-scans (org scope、read のみ)
+      if (
+        /^\/v3\/organizations\/[^/]+\/code-scans\/findings$/.test(u.pathname) &&
+        req.method === "GET"
+      )
+        return Response.json(CODE_SCAN_FINDINGS);
+      if (
+        /^\/v3\/organizations\/[^/]+\/code-scans\/metrics$/.test(u.pathname) &&
+        req.method === "GET"
+      )
+        return Response.json(CODE_SCAN_METRICS);
+      if (
+        /^\/v3\/organizations\/[^/]+\/code-scans\/scans$/.test(u.pathname) &&
+        req.method === "GET"
+      )
+        return Response.json(CODE_SCAN_SCANS);
+      if (
+        /^\/v3\/organizations\/[^/]+\/code-scans\/profiles$/.test(u.pathname) &&
+        req.method === "GET"
+      )
+        return Response.json(CODE_SCAN_PROFILES);
+      const codeScanProfileMatch =
+        /^\/v3\/organizations\/[^/]+\/code-scans\/profiles\/([^/]+)$/.exec(u.pathname);
+      if (codeScanProfileMatch && req.method === "GET")
+        return Response.json(CODE_SCAN_PROFILE_DETAIL);
+
+      // snapshot-setup (org scope)
+      if (/^\/v3\/organizations\/[^/]+\/snapshot-setup\/blueprints$/.test(u.pathname)) {
+        if (req.method === "GET") return Response.json(SNAPSHOT_BLUEPRINT_LIST);
+        if (req.method === "POST") return Response.json(SNAPSHOT_BLUEPRINT_ORG, { status: 201 });
+      }
+      const blueprintSub =
+        /^\/v3\/organizations\/[^/]+\/snapshot-setup\/blueprints\/([^/]+)\/(contents|files)(?:\/([^/]+))?$/.exec(
+          u.pathname,
+        );
+      if (blueprintSub) {
+        const [, , sub, fileId] = blueprintSub;
+        if (sub === "contents" && req.method === "GET") return Response.json(SNAPSHOT_PRESIGNED);
+        if (sub === "files" && !fileId) {
+          if (req.method === "GET") return Response.json(SNAPSHOT_BLUEPRINT_FILE_LIST);
+          if (req.method === "POST") return Response.json(SNAPSHOT_BLUEPRINT_FILE, { status: 201 });
+        }
+        if (sub === "files" && fileId && req.method === "DELETE")
+          return new Response(null, { status: 204 });
+      }
+      const blueprintMatch =
+        /^\/v3\/organizations\/[^/]+\/snapshot-setup\/blueprints\/([^/]+)$/.exec(u.pathname);
+      if (blueprintMatch) {
+        if (req.method === "GET") return Response.json(SNAPSHOT_BLUEPRINT_ORG);
+        if (req.method === "PATCH") return Response.json(SNAPSHOT_BLUEPRINT_ORG);
+        if (req.method === "DELETE") return new Response(null, { status: 204 });
+      }
+      if (/^\/v3\/organizations\/[^/]+\/snapshot-setup\/builds$/.test(u.pathname)) {
+        if (req.method === "GET") {
+          const after = u.searchParams.get("after");
+          return Response.json(after === "cur-2" ? SNAPSHOT_BUILDS_PAGE2 : SNAPSHOT_BUILDS_PAGE1);
+        }
+        if (req.method === "POST") return Response.json(SNAPSHOT_BUILD, { status: 201 });
+      }
+      const buildSub =
+        /^\/v3\/organizations\/[^/]+\/snapshot-setup\/builds\/([^/]+)\/(logs|cancel|pin)$/.exec(
+          u.pathname,
+        );
+      if (buildSub) {
+        const [, , sub] = buildSub;
+        if (sub === "logs" && req.method === "GET") return Response.json(SNAPSHOT_PRESIGNED);
+        if (sub === "cancel" && req.method === "POST") return Response.json(SNAPSHOT_BUILD);
+        if (sub === "pin") {
+          if (req.method === "POST") return Response.json(SNAPSHOT_BUILD);
+          if (req.method === "DELETE") return new Response(null, { status: 204 });
+        }
+      }
+      const buildMatch = /^\/v3\/organizations\/[^/]+\/snapshot-setup\/builds\/([^/]+)$/.exec(
+        u.pathname,
+      );
+      if (buildMatch && req.method === "GET") return Response.json(SNAPSHOT_BUILD);
 
       // --- members (v3beta1) ---
       const memberUserMatch = /^\/v3beta1\/organizations\/[^/]+\/members\/users\/([^/]+)$/.exec(

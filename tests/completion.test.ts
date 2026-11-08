@@ -15,6 +15,9 @@ const TOP_COMMANDS = [
   "billing",
   "consumption",
   "metrics",
+  "repositories",
+  "code-scans",
+  "snapshot",
   "sessions",
   "notes",
   "automations",
@@ -42,6 +45,24 @@ const SESSIONS_SUBCOMMANDS = [
   "delete",
 ];
 const NEW_WORDS = ["folders", "list", "get", "create", "update", "delete", "schemas", "templates"];
+// repositories / code-scans / snapshot のサブコマンド語
+const INFRA_WORDS = [
+  "indexing",
+  "indexing-repo",
+  "indexing-branch",
+  "findings",
+  "scans",
+  "profiles",
+  "blueprints",
+  "builds",
+  "contents",
+  "files",
+  "upload",
+  "logs",
+  "cancel",
+  "pin",
+  "unpin",
+];
 // org-resources 系だけが持つサブコマンド名
 const ORG_WORDS = ["idp-users", "upload", "download", "set"];
 const ALL_WORDS = [
@@ -50,6 +71,7 @@ const ALL_WORDS = [
   ...METRIC_NAMES,
   ...SESSIONS_SUBCOMMANDS,
   ...NEW_WORDS,
+  ...INFRA_WORDS,
   ...ORG_WORDS,
 ];
 // org-resources 系だけが持つオプション
@@ -80,6 +102,24 @@ describe("completion", () => {
       "--body-json",
       "--prompt",
       "--yes",
+      // repositories / code-scans / snapshot
+      "--filter",
+      "--branch",
+      "--repo",
+      "--scan",
+      "--q",
+      "--severity",
+      "--status",
+      "--payoff",
+      "--type",
+      "--source",
+      "--contents",
+      "--contents-file",
+      "--position",
+      "--build-on-default-branch",
+      "--report-check-runs",
+      "--name",
+      "--active",
       ...ORG_OPTS,
     ])
       expect(r.out).toContain(o);
@@ -101,6 +141,24 @@ describe("completion", () => {
       "--body-json",
       "--prompt",
       "--yes",
+      // repositories / code-scans / snapshot
+      "--filter",
+      "--branch",
+      "--repo",
+      "--scan",
+      "--q",
+      "--severity",
+      "--status",
+      "--payoff",
+      "--type",
+      "--source",
+      "--contents",
+      "--contents-file",
+      "--position",
+      "--build-on-default-branch",
+      "--report-check-runs",
+      "--name",
+      "--active",
       ...ORG_OPTS,
     ])
       expect(r.out).toContain(o);
@@ -122,6 +180,20 @@ describe("completion", () => {
       "-l body-json",
       "-l prompt",
       "-l yes",
+      // repositories / code-scans / snapshot
+      "-l filter",
+      "-l branch",
+      "-l repo",
+      "-l scan",
+      "-l severity",
+      "-l status",
+      "-l payoff",
+      "-l type",
+      "-l source",
+      "-l contents",
+      "-l position",
+      "-l name",
+      "-l active",
       "-l commit-sha",
       "-l out",
       "-l macro",

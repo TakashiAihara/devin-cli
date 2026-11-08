@@ -12,6 +12,9 @@ const TOP_COMMANDS = [
   "billing",
   "consumption",
   "metrics",
+  "repositories",
+  "code-scans",
+  "snapshot",
   "sessions",
   "notes",
   "automations",
@@ -56,6 +59,26 @@ const SECURITY_PROFILES_SUBCOMMANDS = ["list", "get", "create", "update", "delet
 const SECURITY_PROFILE_SETTINGS_SUBCOMMANDS = ["get", "update"];
 const DEFAULT_PLATFORM_SUBCOMMANDS = ["get", "set"];
 
+// repositories は list がリーフ、indexing / indexing-repo / indexing-branch が
+// さらにサブコマンドを持つ 3 段構成。snapshot も blueprints / builds の下にリーフがある
+const REPOSITORIES_SUBCOMMANDS = ["list", "indexing", "indexing-repo", "indexing-branch"];
+const INDEXING_SUBCOMMANDS = ["list", "set", "delete"];
+const INDEXING_REPO_SUBCOMMANDS = ["get", "set", "delete"];
+const INDEXING_BRANCH_SUBCOMMANDS = ["delete"];
+const CODE_SCANS_SUBCOMMANDS = ["findings", "metrics", "scans", "profiles"];
+const SNAPSHOT_SUBCOMMANDS = ["blueprints", "builds"];
+const SNAPSHOT_BLUEPRINTS_SUBCOMMANDS = [
+  "list",
+  "get",
+  "create",
+  "update",
+  "delete",
+  "contents",
+  "files",
+];
+const SNAPSHOT_BLUEPRINT_FILES_SUBCOMMANDS = ["list", "upload", "delete"];
+const SNAPSHOT_BUILDS_SUBCOMMANDS = ["list", "get", "create", "logs", "cancel", "pin", "unpin"];
+
 // sessions のサブコマンドごとのオプション (cli.ts と対応)
 const SESSIONS_LIST_OPTS =
   "--limit --status --archived --active --tag --origin --user --repo --created-after --created-before --updated-after --updated-before --org --json";
@@ -64,6 +87,18 @@ const SESSIONS_CREATE_OPTS =
   "--prompt --title --repo --tag --playbook-id --attachment --mode --max-acu --platform --bypass-approval --org --json";
 const SESSIONS_DELETE_OPTS = "--yes --archive --org --json";
 const SESSIONS_PLAIN_OPTS = "--org --json";
+
+// code-scans はフラットなのでリーフごとのオプションを出す (sessions と同じ方式)。
+// repositories / snapshot はグループ単位の和集合 (notes / automations と同じ方式)
+const CODE_SCANS_FINDINGS_OPTS =
+  "--limit --repo --scan --q --severity --status --payoff --org --json";
+const CODE_SCANS_METRICS_OPTS = "--days --org --json";
+const CODE_SCANS_SCANS_OPTS = "--limit --repo --type --days --org --json";
+const CODE_SCANS_PROFILES_OPTS = "--limit --org --json";
+const REPOSITORIES_OPTIONS = "--limit --filter --branch --org --json";
+const SNAPSHOT_BLUEPRINTS_OPTIONS =
+  "--repo --source --contents --contents-file --position --build-on-default-branch --report-check-runs --name --org --json";
+const SNAPSHOT_BUILDS_OPTIONS = "--limit --status --active --yes --org --json";
 
 // グループごとのオプション集合 (サブコマンド名より後でのみ有効)
 const NOTES_OPTIONS =
@@ -135,6 +170,21 @@ const VALUE_OPTIONS = [
   "--attachment",
   "--mode",
   "--max-acu",
+  // repositories / code-scans / snapshot 用
+  "--filter",
+  "--branch",
+  "--scan",
+  "--q",
+  "--severity",
+  "--payoff",
+  "--type",
+  "--source",
+  "--contents",
+  "--contents-file",
+  "--position",
+  "--build-on-default-branch",
+  "--report-check-runs",
+  // org-resources 系 (members / playbooks / pr-reviews / attachments / security-profiles / default-platform)
   "--macro",
   "--structured-output-schema",
   "--commit-sha",
@@ -194,6 +244,30 @@ _devin_cli() {
           # consumption / metrics は第 2 引数 (サブコマンド・metrics 名) の後でのみ有効
           if [ "$COMP_CWORD" -ge 3 ]; then
             opts="$opts --days --org --json"
+          fi
+          ;;
+        repositories)
+          # 3 段構成でもリーフの位置 (第 3 語以降) では和集合のオプションを出す
+          if [ "$COMP_CWORD" -ge 3 ]; then
+            opts="$opts ${REPOSITORIES_OPTIONS}"
+          fi
+          ;;
+        code-scans)
+          if [ "$COMP_CWORD" -ge 3 ]; then
+            case "$sub" in
+              findings) opts="$opts ${CODE_SCANS_FINDINGS_OPTS}" ;;
+              metrics) opts="$opts ${CODE_SCANS_METRICS_OPTS}" ;;
+              scans) opts="$opts ${CODE_SCANS_SCANS_OPTS}" ;;
+              profiles) opts="$opts ${CODE_SCANS_PROFILES_OPTS}" ;;
+            esac
+          fi
+          ;;
+        snapshot)
+          if [ "$COMP_CWORD" -ge 3 ]; then
+            case "$sub" in
+              blueprints) opts="$opts ${SNAPSHOT_BLUEPRINTS_OPTIONS}" ;;
+              builds) opts="$opts ${SNAPSHOT_BUILDS_OPTIONS}" ;;
+            esac
           fi
           ;;
         sessions)
@@ -277,6 +351,39 @@ _devin_cli() {
     metrics)
       if [ "$COMP_CWORD" -eq 2 ]; then
         COMPREPLY=($(compgen -W "${METRICS.join(" ")}" -- "$cur"))
+      fi
+      ;;
+    repositories)
+      if [ "$COMP_CWORD" -eq 2 ]; then
+        COMPREPLY=($(compgen -W "${REPOSITORIES_SUBCOMMANDS.join(" ")}" -- "$cur"))
+      elif [ "$COMP_CWORD" -eq 3 ]; then
+        # indexing 系はグループなのでさらにサブコマンドを出す (list はリーフなので出さない)
+        case "$sub" in
+          indexing) COMPREPLY=($(compgen -W "${INDEXING_SUBCOMMANDS.join(" ")}" -- "$cur")) ;;
+          indexing-repo)
+            COMPREPLY=($(compgen -W "${INDEXING_REPO_SUBCOMMANDS.join(" ")}" -- "$cur"))
+            ;;
+          indexing-branch)
+            COMPREPLY=($(compgen -W "${INDEXING_BRANCH_SUBCOMMANDS.join(" ")}" -- "$cur"))
+            ;;
+        esac
+      fi
+      ;;
+    code-scans)
+      if [ "$COMP_CWORD" -eq 2 ]; then
+        COMPREPLY=($(compgen -W "${CODE_SCANS_SUBCOMMANDS.join(" ")}" -- "$cur"))
+      fi
+      ;;
+    snapshot)
+      if [ "$COMP_CWORD" -eq 2 ]; then
+        COMPREPLY=($(compgen -W "${SNAPSHOT_SUBCOMMANDS.join(" ")}" -- "$cur"))
+      elif [ "$COMP_CWORD" -eq 3 ]; then
+        case "$sub" in
+          blueprints) COMPREPLY=($(compgen -W "${SNAPSHOT_BLUEPRINTS_SUBCOMMANDS.join(" ")}" -- "$cur")) ;;
+          builds) COMPREPLY=($(compgen -W "${SNAPSHOT_BUILDS_SUBCOMMANDS.join(" ")}" -- "$cur")) ;;
+        esac
+      elif [ "$COMP_CWORD" -eq 4 ] && [ "$sub" = "blueprints" ] && [ "\${COMP_WORDS[3]}" = "files" ]; then
+        COMPREPLY=($(compgen -W "${SNAPSHOT_BLUEPRINT_FILES_SUBCOMMANDS.join(" ")}" -- "$cur"))
       fi
       ;;
     sessions)
@@ -370,6 +477,28 @@ _devin_cli() {
           # consumption / metrics は第 2 引数の後でのみ有効
           (( CURRENT >= 4 )) && candidates+=(--days --org --json)
           ;;
+        repositories)
+          # 3 段構成でもリーフの位置 (第 3 語以降) では和集合のオプションを出す
+          (( CURRENT >= 4 )) && candidates+=(${REPOSITORIES_OPTIONS})
+          ;;
+        code-scans)
+          if (( CURRENT >= 4 )); then
+            case "$sub" in
+              findings) candidates+=(${CODE_SCANS_FINDINGS_OPTS}) ;;
+              metrics) candidates+=(${CODE_SCANS_METRICS_OPTS}) ;;
+              scans) candidates+=(${CODE_SCANS_SCANS_OPTS}) ;;
+              profiles) candidates+=(${CODE_SCANS_PROFILES_OPTS}) ;;
+            esac
+          fi
+          ;;
+        snapshot)
+          if (( CURRENT >= 4 )); then
+            case "$sub" in
+              blueprints) candidates+=(${SNAPSHOT_BLUEPRINTS_OPTIONS}) ;;
+              builds) candidates+=(${SNAPSHOT_BUILDS_OPTIONS}) ;;
+            esac
+          fi
+          ;;
         sessions)
           if (( CURRENT >= 4 )); then
             case "$sub" in
@@ -419,6 +548,9 @@ _devin_cli() {
     case "$cmd" in
       consumption) candidates=(${CONSUMPTION_SUBCOMMANDS.join(" ")}) ;;
       metrics) candidates=(${METRICS.join(" ")}) ;;
+      repositories) candidates=(${REPOSITORIES_SUBCOMMANDS.join(" ")}) ;;
+      code-scans) candidates=(${CODE_SCANS_SUBCOMMANDS.join(" ")}) ;;
+      snapshot) candidates=(${SNAPSHOT_SUBCOMMANDS.join(" ")}) ;;
       sessions) candidates=(${SESSIONS_SUBCOMMANDS.join(" ")}) ;;
       notes) candidates=(${NOTES_SUBCOMMANDS.join(" ")}) ;;
       automations) candidates=(${AUTOMATIONS_SUBCOMMANDS.join(" ")}) ;;
@@ -432,8 +564,21 @@ _devin_cli() {
       default-platform) candidates=(${DEFAULT_PLATFORM_SUBCOMMANDS.join(" ")}) ;;
       completion) candidates=(${SHELLS.join(" ")}) ;;
     esac
-  elif (( CURRENT == 4 )) && [[ "$cmd" == "sessions" && "$sub" == "tags" ]]; then
-    candidates=(get add set)
+  elif (( CURRENT == 4 )); then
+    if [[ "$cmd" == "sessions" && "$sub" == "tags" ]]; then
+      candidates=(get add set)
+    else
+      # repositories / snapshot のグループの下のサブコマンド
+      case "$cmd:$sub" in
+        repositories:indexing) candidates=(${INDEXING_SUBCOMMANDS.join(" ")}) ;;
+        repositories:indexing-repo) candidates=(${INDEXING_REPO_SUBCOMMANDS.join(" ")}) ;;
+        repositories:indexing-branch) candidates=(${INDEXING_BRANCH_SUBCOMMANDS.join(" ")}) ;;
+        snapshot:blueprints) candidates=(${SNAPSHOT_BLUEPRINTS_SUBCOMMANDS.join(" ")}) ;;
+        snapshot:builds) candidates=(${SNAPSHOT_BUILDS_SUBCOMMANDS.join(" ")}) ;;
+      esac
+    fi
+  elif (( CURRENT == 5 )) && [[ "$cmd" == "snapshot" && "$sub" == "blueprints" && "\${words[4]}" == "files" ]]; then
+    candidates=(${SNAPSHOT_BLUEPRINT_FILES_SUBCOMMANDS.join(" ")})
   fi
 
   if (( \${#candidates[@]} > 0 )); then
@@ -512,6 +657,33 @@ const GROUP_VALUE_OPTIONS: Record<string, string[]> = {
     "--create-as-user-id",
     "--run-as-user-id",
   ],
+  // リーフごとに有効なオプションは違うが、fish ではグループ単位の和集合で出す
+  repositories: ["--org", "--limit", "--filter", "--branch"],
+  "code-scans": [
+    "--org",
+    "--limit",
+    "--repo",
+    "--scan",
+    "--q",
+    "--severity",
+    "--status",
+    "--payoff",
+    "--days",
+    "--type",
+  ],
+  snapshot: [
+    "--org",
+    "--repo",
+    "--source",
+    "--contents",
+    "--contents-file",
+    "--position",
+    "--build-on-default-branch",
+    "--report-check-runs",
+    "--name",
+    "--limit",
+    "--status",
+  ],
   members: ["--org", "--limit"],
   playbooks: [
     "--org",
@@ -553,6 +725,7 @@ const GROUP_BOOL_OPTIONS: Record<string, string[]> = {
   notes: ["--enabled", "--disabled", "--clear-folder", "--clear-pinned-repo"],
   automations: ["--enabled", "--disabled"],
   schedules: ["--enabled", "--disabled", "--bypass-approval"],
+  snapshot: ["--active", "--yes"],
   playbooks: ["--include-enterprise"],
   "security-profiles": ["--clear-mcp-config"],
   "default-platform": ["--clear"],
@@ -569,6 +742,9 @@ complete -c devin-cli -f -n '__fish_use_subcommand' -a 'self' -d 'GET /v3/self�
 complete -c devin-cli -f -n '__fish_use_subcommand' -a 'billing' -d '直近 N 日の ACU 消費サマリ (合計・製品別・日別)'
 complete -c devin-cli -f -n '__fish_use_subcommand' -a 'consumption' -d '日次 ACU 消費 (組織・ユーザー・service user・session)'
 complete -c devin-cli -f -n '__fish_use_subcommand' -a 'metrics' -d '組織の利用 metrics'
+complete -c devin-cli -f -n '__fish_use_subcommand' -a 'repositories' -d 'org scope の repositories / indexing'
+complete -c devin-cli -f -n '__fish_use_subcommand' -a 'code-scans' -d 'org scope の code-scans (read 系)'
+complete -c devin-cli -f -n '__fish_use_subcommand' -a 'snapshot' -d 'snapshot-setup の blueprints / builds'
 complete -c devin-cli -f -n '__fish_use_subcommand' -a 'sessions' -d 'Devin セッション (一覧・詳細・メッセージ・insights・作成・archive・タグ・削除)'
 complete -c devin-cli -f -n '__fish_use_subcommand' -a 'notes' -d 'knowledge notes (org scope)'
 complete -c devin-cli -f -n '__fish_use_subcommand' -a 'automations' -d 'automations (org scope)'
@@ -593,6 +769,22 @@ complete -c devin-cli -f -n '__fish_seen_subcommand_from sessions; and not __fis
 
 # sessions tags の get / add / set (tags の直後でのみ)
 complete -c devin-cli -f -n '__fish_seen_subcommand_from tags' -a 'get add set'
+
+${fishGroup("repositories", REPOSITORIES_SUBCOMMANDS)}
+
+# repositories indexing 系のサブコマンド (グループ名の直後でのみ)
+complete -c devin-cli -f -n '__fish_seen_subcommand_from indexing; and not __fish_seen_subcommand_from list set delete' -a 'list set delete'
+complete -c devin-cli -f -n '__fish_seen_subcommand_from indexing-repo; and not __fish_seen_subcommand_from get set delete' -a 'get set delete'
+complete -c devin-cli -f -n '__fish_seen_subcommand_from indexing-branch; and not __fish_seen_subcommand_from delete' -a 'delete'
+
+${fishGroup("code-scans", CODE_SCANS_SUBCOMMANDS)}
+
+${fishGroup("snapshot", SNAPSHOT_SUBCOMMANDS)}
+
+# snapshot blueprints / builds のサブコマンドと、blueprints files のサブコマンド
+complete -c devin-cli -f -n '__fish_seen_subcommand_from blueprints; and not __fish_seen_subcommand_from list get create update delete contents files' -a 'list get create update delete contents files'
+complete -c devin-cli -f -n '__fish_seen_subcommand_from builds; and not __fish_seen_subcommand_from list get create logs cancel pin unpin' -a 'list get create logs cancel pin unpin'
+complete -c devin-cli -f -n '__fish_seen_subcommand_from files; and not __fish_seen_subcommand_from list upload delete' -a 'list upload delete'
 
 ${fishGroup("notes", NOTES_SUBCOMMANDS)}
 
@@ -620,9 +812,9 @@ complete -c devin-cli -f -n '__fish_seen_subcommand_from completion' -a '${SHELL
 # オプション。self は --json のみ、billing / consumption の各サブコマンド / metrics は --days --org --json
 complete -c devin-cli -s h -l help -d 'display help for command'
 complete -c devin-cli -s V -l version -d 'output the version number' -n 'not __fish_seen_subcommand_from ${TOP_COMMANDS.join(" ")}'
-complete -c devin-cli -l json -d 'TSV ではなく JSON を stdout に出す' -n '__fish_seen_subcommand_from self billing metrics sessions notes automations schedules members playbooks pr-reviews attachments security-profiles security-profile-settings default-platform; or __fish_seen_subcommand_from ${CONSUMPTION_SUBCOMMANDS.join(" ")}'
+complete -c devin-cli -l json -d 'TSV ではなく JSON を stdout に出す' -n '__fish_seen_subcommand_from self billing metrics repositories code-scans snapshot sessions notes automations schedules members playbooks pr-reviews attachments security-profiles security-profile-settings default-platform; or __fish_seen_subcommand_from ${CONSUMPTION_SUBCOMMANDS.join(" ")}'
 complete -c devin-cli -l days -x -d '直近 N 暦日' -n '__fish_seen_subcommand_from billing metrics; or __fish_seen_subcommand_from ${CONSUMPTION_SUBCOMMANDS.join(" ")}'
-complete -c devin-cli -l org -x -d 'org ID (省略時は自動解決)' -n '__fish_seen_subcommand_from billing metrics sessions notes automations schedules members playbooks pr-reviews attachments security-profiles security-profile-settings default-platform; or __fish_seen_subcommand_from ${CONSUMPTION_SUBCOMMANDS.join(" ")}'
+complete -c devin-cli -l org -x -d 'org ID (省略時は自動解決)' -n '__fish_seen_subcommand_from billing metrics repositories code-scans snapshot sessions notes automations schedules members playbooks pr-reviews attachments security-profiles security-profile-settings default-platform; or __fish_seen_subcommand_from ${CONSUMPTION_SUBCOMMANDS.join(" ")}'
 
 # sessions list / insights のフィルタと --limit
 complete -c devin-cli -l limit -x -d '出力する最大件数' -n '__fish_seen_subcommand_from list insights'

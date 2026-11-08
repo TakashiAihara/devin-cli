@@ -28,6 +28,11 @@ bun run start -- notes list
 bun run start -- notes create --title "Deploy 手順" --body-file deploy.md --trigger "deploy を頼まれたとき"
 bun run start -- automations list
 bun run start -- automations schemas
+bun run start -- repositories list
+bun run start -- code-scans findings
+bun run start -- code-scans metrics --days 30
+bun run start -- snapshot blueprints list
+bun run start -- snapshot builds list
 ```
 
 グローバルに使いたい場合は `bun link` するか `bun build --compile` でバイナリを作る（リリースバイナリ配布は今後対応）。
@@ -77,6 +82,23 @@ echo 'source ~/.devin-cli-completion.bash' >> ~/.bashrc
 | `schedules create --name <n> --prompt <text> [--schedule-type recurring\|one_time] [--frequency <cron>] [--scheduled-at <datetime>] ...` | schedule 作成 |
 | `schedules update <id> [フィールド] [--enabled\|--disabled]` | schedule 更新（PATCH の差分） |
 | `schedules delete <id>` | schedule 削除（soft delete） |
+| `repositories list [--limit N] [--filter <name>]` | 組織が使えるリポジトリ一覧（cursor pagination は `--limit` まで自動で辿る） |
+| `repositories indexing list\|set\|delete` | indexing の一括設定。`set`/`delete` は `<paths...>` を取り、`set` は `--branch`（繰り返し可）でブランチ指定 |
+| `repositories indexing-repo <path> get\|set\|delete` | リポジトリ別の indexing 設定（`<path>` は `org/repo` 形式。API には `org%2Frepo` として送られる） |
+| `repositories indexing-branch delete <path> <branch>` | ブランチ単位で indexing 対象から外す |
+| `code-scans findings [--limit N] [--repo] [--scan] [--q] [--severity] [--status] [--payoff]` | code scan findings 一覧（read のみ。scan 作成・ingestion・remediation は実装していない） |
+| `code-scans metrics [--days N]` | code scan の集計 metrics。期間は `--days`（UTC 日窓、既定 30） |
+| `code-scans scans [--limit N] [--repo] [--type] [--days N]` | code scan 一覧 |
+| `code-scans profiles [profile_id] [--limit N]` | profile 一覧 / 詳細 |
+| `snapshot blueprints list [--repo <name>]` | snapshot blueprint 一覧（`data` envelope をフラット化） |
+| `snapshot blueprints get\|delete\|contents <id>` | blueprint 詳細 / soft-delete / YAML の presigned URL |
+| `snapshot blueprints create [--repo] [--source git\|database] [--contents <yaml>\|--contents-file <path>]` | blueprint 作成。`--source git` は repo の `.devin/blueprint.yaml` を読むので contents は不可 |
+| `snapshot blueprints update <id> [...]` | blueprint の部分更新（PATCH。指定した項目だけ送る。引数無しは exit 2） |
+| `snapshot blueprints files list\|upload\|delete` | blueprint file（環境変数置換素材）の一覧 / アップロード（multipart、`--name` 必須）/ 削除 |
+| `snapshot builds list [--limit N] [--status] [--active]` | snapshot build 一覧 |
+| `snapshot builds get\|logs <id>` | build 詳細 / ログの presigned URL |
+| `snapshot builds create --yes` | build の手動起動。**計算リソースを消費する可能性があるため `--yes` 必須**（無指定は exit 2 で API を叩かない） |
+| `snapshot builds cancel\|pin\|unpin <id>` | build のキャンセル / pin / unpin（pin は成功から 7 日以内のみ） |
 | `members list [--limit N]` | org メンバー一覧（v3beta1。cursor pagination、`--limit` で件数上限） |
 | `members get <user_id>` | メンバー詳細（直接 + IDP 由来の role） |
 | `members idp-users [--limit N]` | IDP グループ由来のメンバー一覧 |
@@ -147,10 +169,13 @@ api_key_command = "op read op://Private/devin-api-key/credential"  # 1Password C
 - notes 系: 読み取りは org 参加で可。作成・更新・削除は knowledge 管理権限が必要
 - automations 系: 一覧・`schemas`・`templates` は `ViewOrgAutomations`、作成・更新・削除は `ManageOrgAutomations`
 - schedules 系: `ManageOrgSchedules`（deprecated）
+- repositories / code-scans / snapshot 系: org scope の各エンドポイント。必要な権限はリソースごとに異なる（リポジトリ管理・code scan 閲覧・snapshot 構成など。Devin docs の permissions 一覧を参照）
 
 PAT / service user に権限を付けて発行する。Pro plan (self-serve) では org scope の consumption / metrics / sessions / notes / automations / schedules の読み取り系を実測済み。`--days` の上限は 100（consumption / metrics とも。CLI 側でも検査する）。
 
 **`sessions create` は実費（ACU）が発生する操作**。`--max-acu` で上限を付けられる。**`sessions delete` はセッションを終了する破壊的操作**で、`--yes` を付けない限り dry-run（対象の表示のみ）で exit 2 になる。
+
+**注意**: `repositories indexing set/delete`、`snapshot blueprints create/update/delete`、`snapshot blueprints files upload/delete`、`snapshot builds create/cancel/pin/unpin` は書き込み系。`snapshot builds create` は計算リソースを消費し得るため `--yes` を必須にしている。これらの mutation 系は自動テストでは fake server のみで検証しており、実 API に対する動作確認は GET 系に限ること。
 
 **enterprise scope (`/v3/enterprise/*`, `/v3beta1/enterprise/*`) は対象外**。これらのエンドポイントは Enterprise plan 専用で、Pro/self-serve では全て 403 を返す（実測済み）。そのため org 管理・members/service-users 管理・git-providers・audit-logs 等の enterprise 系コマンドは実装していない。Enterprise plan を使う場合は別途対応が必要（issue #32 参照）。
 
